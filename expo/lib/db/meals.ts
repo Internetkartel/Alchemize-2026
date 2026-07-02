@@ -1,0 +1,1 @@
+export { mealsDb } from '../database';

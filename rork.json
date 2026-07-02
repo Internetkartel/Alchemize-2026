@@ -1,0 +1,15 @@
+{
+  "apps": [
+    {
+      "name": "Expo",
+      "path": "expo",
+      "framework": "react-native"
+    },
+    {
+      "name": "Alchemize",
+      "path": "android-alchemize",
+      "framework": "kotlin"
+    }
+  ],
+  "$schema": "https://rork.com/schema/rork.json"
+}
