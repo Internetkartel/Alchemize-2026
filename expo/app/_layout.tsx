@@ -9,6 +9,7 @@ import { ChevronLeft } from "lucide-react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { SubscriptionProvider, useSubscription } from "@/contexts/subscription-context";
 import { initDatabase } from '@/lib/db/core';
 import NetworkBanner from "@/components/NetworkBanner";
 import GestureOnboarding from "@/components/GestureOnboarding";
@@ -88,6 +89,28 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PaywallGate({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isPro, isLoading: subLoading } = useSubscription();
+  const router = useRouter();
+  const segments = useSegments();
+  const navState = useRootNavigationState();
+
+  useEffect(() => {
+    if (authLoading || subLoading) return;
+    if (!navState?.key) return;
+    if (!isAuthenticated) return; // AuthGate handles unauthenticated users
+    const onPaywall = segments[0] === 'paywall';
+    if (!isPro && !onPaywall) {
+      router.replace('/paywall');
+    } else if (isPro && onPaywall) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, authLoading, isPro, subLoading, segments, navState?.key, router]);
+
+  return <>{children}</>;
+}
+
 function RootLayoutNav() {
   return (
     <Stack
@@ -106,6 +129,7 @@ function RootLayoutNav() {
       }}
     >
       <Stack.Screen name="auth" options={{ title: "Welcome", headerShown: false }} />
+      <Stack.Screen name="paywall" options={{ title: "Alchemize Pro", headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="index" options={{ title: "Alchemize", headerShown: false }} />
       <Stack.Screen name="manifestation-board/index" options={{ title: "Portal Board", headerShown: true }} />
       <Stack.Screen name="manifestation-board/[id]" options={{ title: "Manifestation Detail", headerStyle: { backgroundColor: '#0c0520' }, headerTintColor: '#ffffff' }} />
@@ -167,17 +191,21 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <AuthProvider>
+          <SubscriptionProvider>
           <ThemeProvider>
             <GestureHandlerRootView style={layoutStyles.root}>
               <View style={layoutStyles.root}>
                 <AuthGate>
-                  <RootLayoutNav />
+                  <PaywallGate>
+                    <RootLayoutNav />
+                  </PaywallGate>
                 </AuthGate>
                 <NetworkBanner />
                 <GestureOnboardingGate />
               </View>
             </GestureHandlerRootView>
           </ThemeProvider>
+          </SubscriptionProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </QueryClientProvider>

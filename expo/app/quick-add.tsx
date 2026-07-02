@@ -1,6 +1,6 @@
 import { invalidateGoals, invalidateTasks } from '../services/queryInvalidationService';
 import React, { useState } from 'react';
-import { View, StyleSheet, Text, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, ScrollView, TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { hapticSelection, hapticSuccess } from '@/lib/haptics';
@@ -151,8 +151,12 @@ export default function QuickAddScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Quick Add</Text>
 
         <View style={styles.typeContainer}>
@@ -197,7 +201,7 @@ export default function QuickAddScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

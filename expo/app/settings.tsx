@@ -13,6 +13,7 @@ import {
   Image,
   Switch,
   Animated,
+  KeyboardAvoidingView,
 } from 'react-native';
 import PressableScale from '@/components/PressableScale';
 import { useRouter } from 'expo-router';
@@ -1027,7 +1028,10 @@ export default function SettingsScreen() {
         animationType="slide"
         onRequestClose={() => setEditProfileVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.editProfileModal}>
             <View style={styles.editProfileHeader}>
               <Text style={styles.editProfileTitle}>Edit Profile</Text>
@@ -1065,7 +1069,7 @@ export default function SettingsScreen() {
               </PressableScale>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* About Modal */}

@@ -1,6 +1,6 @@
 import { invalidateFoodLogs } from '../../services/queryInvalidationService';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Text, Platform, ActivityIndicator, ScrollView, TextInput, Alert, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, Text, Platform, ActivityIndicator, ScrollView, TextInput, Alert, Animated, Dimensions, KeyboardAvoidingView } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -553,10 +553,16 @@ export default function FoodScannerScreen() {
           </TouchableOpacity>
         </View>
 
+        <KeyboardAvoidingView
+          style={styles.resultsScroll}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
         <ScrollView
           style={styles.resultsScroll}
           contentContainerStyle={[styles.resultsContent, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View style={styles.barcodeInfoCard}>
             <Text style={styles.barcodeLabel}>Scanned Barcode</Text>
@@ -676,6 +682,7 @@ export default function FoodScannerScreen() {
             )}
           </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     );
   }

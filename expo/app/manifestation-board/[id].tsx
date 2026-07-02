@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Text, Dimensions, TextInput, Alert, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Dimensions, TextInput, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -192,7 +192,12 @@ export default function ManifestationDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.scrollView} contentContainerStyle={styles.editContent}>
+          <KeyboardAvoidingView
+            style={styles.scrollView}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          >
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.editContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.editLabel}>Title</Text>
             <TextInput
               style={styles.editInput}
@@ -251,6 +256,7 @@ export default function ManifestationDetailScreen() {
               </View>
             )}
           </ScrollView>
+          </KeyboardAvoidingView>
         </LinearGradient>
       </View>
     );
