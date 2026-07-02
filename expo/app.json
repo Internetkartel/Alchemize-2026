@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Alchemize",
-    "slug": "alchemize-level-up",
+    "name": "FRC Enterprise - Alchemize",
+    "slug": "alchemize",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rork-app",
+    "scheme": "frc-alchemize",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.repo.alchemize-level-up",
+      "bundleIdentifier": "com.frce.alchemize",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.alchemize_app_skeleton",
+      "package": "com.frce.alchemize",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -41,8 +41,8 @@
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
-      "name": "Alchemize",
-      "shortName": "Alchemize",
+      "name": "FRC Enterprise - Alchemize",
+      "shortName": "FRC Alchemize",
       "themeColor": "#0c0520",
       "backgroundColor": "#0c0520",
       "display": "standalone",
@@ -55,7 +55,7 @@
         "termsOfService": "https://alchemize.app/terms"
       },
       "router": {
-        "origin": "https://rork.com/"
+        "origin": "https://alchemize.app/"
       },
       "eas": {
         "projectId": "8482b587-bf4b-4f73-96da-e7ff086683a3"
@@ -65,7 +65,7 @@
       [
         "expo-router",
         {
-          "origin": "https://rork.com/"
+          "origin": "https://alchemize.app/"
         }
       ],
       "expo-font",
