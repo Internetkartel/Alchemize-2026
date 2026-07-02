@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Plus } from 'lucide-react-native';
 
 interface EmptyStateProps {
@@ -11,8 +11,27 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({ icon, title, subtitle, actionLabel, onAction }: EmptyStateProps) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const riseAnim = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+      }),
+      Animated.spring(riseAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 12,
+        bounciness: 4,
+      }),
+    ]).start();
+  }, [fadeAnim, riseAnim]);
+
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: riseAnim }] }]}>
       {icon && <View style={styles.iconContainer}>{icon}</View>}
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -22,7 +41,7 @@ export default function EmptyState({ icon, title, subtitle, actionLabel, onActio
           <Text style={styles.actionText}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

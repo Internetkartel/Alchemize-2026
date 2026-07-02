@@ -39,7 +39,14 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Alchemize",
+      "shortName": "Alchemize",
+      "themeColor": "#0c0520",
+      "backgroundColor": "#0c0520",
+      "display": "standalone",
+      "orientation": "portrait",
+      "bundler": "metro"
     },
     "extra": {
       "legalUrls": {

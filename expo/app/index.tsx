@@ -10,6 +10,8 @@ import { OPTIMIZED_IMAGE_URLS } from '@/constants/image-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/theme-context';
 import PWAInstallPrompt from './pwa-install-prompt';
+import PressableScale from '@/components/PressableScale';
+import { hapticSelection } from '@/lib/haptics';
 
 const FEATURES_VISIBILITY_KEY = '@alchemize_features_visibility';
 
@@ -120,6 +122,16 @@ export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const screenWidth = Dimensions.get('window').width;
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const entranceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(entranceAnim, {
+      toValue: 1,
+      duration: 550,
+      useNativeDriver: true,
+    }).start();
+  }, [entranceAnim]);
 
   const goToPage = useCallback((page: number) => {
     scrollViewRef.current?.scrollTo({ x: page * screenWidth, animated: true });
@@ -174,11 +186,20 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const handleScroll = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const page = Math.round(offsetX / SCREEN_WIDTH);
-    setCurrentPage(page);
-  };
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const page = Math.round(offsetX / SCREEN_WIDTH);
+        setCurrentPage((prev) => {
+          if (prev !== page) hapticSelection();
+          return page;
+        });
+      },
+    }
+  );
 
   const handleCardPress = (route: string) => {
     router.push(route as any);
@@ -204,8 +225,23 @@ export default function HomeScreen() {
         priority="high"
         transition={0}
       />
-      <View style={styles.carouselContainer}>
-        <ScrollView
+      <Animated.View
+        style={[
+          styles.carouselContainer,
+          {
+            opacity: entranceAnim,
+            transform: [
+              {
+                translateY: entranceAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [24, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Animated.ScrollView
           ref={scrollViewRef}
           horizontal
           pagingEnabled
@@ -215,14 +251,29 @@ export default function HomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
         >
-          {featureCards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              style={styles.cardContainer}
+          {featureCards.map((card, index) => {
+            const inputRange = [
+              (index - 1) * SCREEN_WIDTH,
+              index * SCREEN_WIDTH,
+              (index + 1) * SCREEN_WIDTH,
+            ];
+            const cardScale = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.92, 1, 0.92],
+              extrapolate: 'clamp',
+            });
+            const cardOpacity = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.55, 1, 0.55],
+              extrapolate: 'clamp',
+            });
+            return (
+            <View key={card.id} style={styles.cardContainer}>
+            <PressableScale
               onPress={() => handleCardPress(card.route)}
-              activeOpacity={0.9}
+              pressedScale={0.97}
             >
-              <View style={styles.card}>
+              <Animated.View style={[styles.card, { transform: [{ scale: cardScale }], opacity: cardOpacity }]}>
                 {card.id === 'affirmations' ? (
                   <>
                     <Image 
@@ -265,10 +316,12 @@ export default function HomeScreen() {
                     </View>
                   </View>
                 </LinearGradient>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              </Animated.View>
+            </PressableScale>
+            </View>
+            );
+          })}
+        </Animated.ScrollView>
 
         <View style={styles.footer}>
           <View style={styles.navRow}>
@@ -290,15 +343,15 @@ export default function HomeScreen() {
             {currentPage + 1} of {featureCards.length}
           </Text>
         </View>
-      </View>
+      </Animated.View>
 
-      <TouchableOpacity
+      <PressableScale
         style={styles.settingsButton}
         onPress={() => router.push('/settings' as any)}
-        activeOpacity={0.8}
+        pressedScale={0.9}
       >
         <Settings color="#fff" size={24} />
-      </TouchableOpacity>
+      </PressableScale>
 
       <PWAInstallPrompt />
     </View>

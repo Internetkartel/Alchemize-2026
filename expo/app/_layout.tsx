@@ -12,6 +12,7 @@ import { initDatabase } from '@/lib/db/core';
 import NetworkBanner from "@/components/NetworkBanner";
 import GestureOnboarding from "@/components/GestureOnboarding";
 import { registerForPushNotifications } from "@/lib/notifications";
+import { applyWebPolish } from "@/lib/web-polish";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -99,6 +100,8 @@ function RootLayoutNav() {
         gestureEnabled: true,
         fullScreenGestureEnabled: true,
         animation: 'slide_from_right',
+        animationDuration: 280,
+        contentStyle: { backgroundColor: '#0c0520' },
       }}
     >
       <Stack.Screen name="auth" options={{ title: "Welcome", headerShown: false }} />
@@ -142,6 +145,7 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   useEffect(() => {
+    applyWebPolish();
     if (Platform.OS !== 'web') {
       console.log('[App] Initializing database...');
       initDatabase()
