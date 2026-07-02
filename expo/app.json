@@ -17,6 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.repo.alchemize-level-up",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera",
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone"
@@ -29,13 +30,13 @@
       },
       "package": "app.rork.alchemize_app_skeleton",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.VIBRATE",
-        "RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -52,6 +53,12 @@
       "legalUrls": {
         "privacy": "https://alchemize.app/privacy",
         "termsOfService": "https://alchemize.app/terms"
+      },
+      "router": {
+        "origin": "https://rork.com/"
+      },
+      "eas": {
+        "projectId": "8482b587-bf4b-4f73-96da-e7ff086683a3"
       }
     },
     "plugins": [
@@ -106,6 +113,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "internetkartel"
   }
 }
