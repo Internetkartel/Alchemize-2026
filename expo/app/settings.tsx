@@ -1173,6 +1173,11 @@ export default function SettingsScreen() {
               <Text style={styles.legalText}>
                 For support or legal questions, contact: support@alchemize.app
               </Text>
+
+              <View style={styles.legalCreditWrap}>
+                <Text style={styles.legalCredit}>Development by CRF Enterprise</Text>
+                <Text style={styles.legalCredit}>Powered &amp; Designed by Metallicv1</Text>
+              </View>
               <View style={styles.legalBottomPadding} />
             </ScrollView>
           </View>
@@ -2043,6 +2048,19 @@ const styles = StyleSheet.create({
   },
   legalBottomPadding: {
     height: 40,
+  },
+  legalCreditWrap: {
+    marginTop: 28,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(139, 92, 246, 0.25)',
+  },
+  legalCredit: {
+    fontSize: 13,
+    color: '#8b5cf6',
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
+    marginTop: 4,
   },
   featuresDescription: {
     fontSize: 14,
