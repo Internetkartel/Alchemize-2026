@@ -32,7 +32,7 @@ export const tasksRouter = createTRPCRouter({
         userId: ctx.user.id,
         ...input,
         isDone: false,
-        order: 0,
+        orderIndex: 0,
         completedDate: null,
         reminderEnabled: false,
         reminderTime: null,

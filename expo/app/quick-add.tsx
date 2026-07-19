@@ -51,7 +51,9 @@ export default function QuickAddScreen() {
 
   const createGratitudeMutation = useMutation({
     mutationFn: async (entry: GratitudeEntry) => {
-      const result = await gratitudeSupabase.create(entry);
+      // Gratitude entries are one-per-user-per-day; use save() (upsert) since an entry for
+      // today may already exist (e.g. created via the dedicated Gratitude screen).
+      const result = await gratitudeSupabase.save(entry);
       if (!result.success) throw new Error(result.error);
       return result;
     },

@@ -57,12 +57,16 @@ export default function AddMealScreen() {
 
   const createMutation = useMutation({
     mutationFn: async (foodLog: FoodLog) => {
-      if (Platform.OS === 'web') return;
-      
       const calendarEventId = `cal-${Date.now()}`;
+      const updatedFoodLog = { ...foodLog, calendarEventId };
+
+      // Save the food log first — it's the record that actually matters. The calendar
+      // reminder below is best-effort and must never leave an orphaned entry if it fails.
+      await foodLogsDb.create(updatedFoodLog);
+
       const loggedDate = new Date(foodLog.loggedAt);
       const timeStr = loggedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      
+
       const calendarEvent: Appointment = {
         id: calendarEventId,
         title: `${foodLog.foodName} (${foodLog.mealType})`,
@@ -83,11 +87,12 @@ export default function AddMealScreen() {
           isLocked: foodLog.isLocked,
         }),
       };
-      
-      await appointmentsDb.create(calendarEvent);
-      
-      const updatedFoodLog = { ...foodLog, calendarEventId };
-      return foodLogsDb.create(updatedFoodLog);
+
+      try {
+        await appointmentsDb.create(calendarEvent);
+      } catch (error) {
+        console.error('[AddFood] Calendar reminder creation failed (food log still saved):', error);
+      }
     },
     onSuccess: () => {
       invalidateFoodLogs(queryClient);

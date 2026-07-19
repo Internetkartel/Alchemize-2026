@@ -433,8 +433,10 @@ export default function FinancialTrackerScreen() {
   const incomeCategories = ['salary', 'freelance', 'business', 'investment', 'bonus', 'other'];
   const expenseCategories = ['bills', 'business', 'personal', 'food', 'transport', 'entertainment', 'shopping', 'health', 'education', 'other'];
 
-  const formatCurrency = (val: number) =>
-    '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatCurrency = (val: number) => {
+    const formatted = Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return val < 0 ? `-$${formatted}` : `$${formatted}`;
+  };
 
   return (
     <View style={styles.container}>

@@ -1156,14 +1156,25 @@ export const goalChecklistDb = {
 export const goalCompletionsDb = {
   async getByGoalId(goalId: string): Promise<GoalCompletion[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<GoalCompletion>('SELECT * FROM goal_completions WHERE goalId = ? ORDER BY completionDate DESC', [goalId]);
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<GoalCompletion>(
+      `SELECT gc.* FROM goal_completions gc
+       INNER JOIN goals g ON g.id = gc.goalId
+       WHERE gc.goalId = ? AND g.userId = ?
+       ORDER BY gc.completionDate DESC`,
+      [goalId, userId]
+    );
   },
-  
+
   async getByDateRange(goalId: string, startDate: number, endDate: number): Promise<GoalCompletion[]> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     return database.getAllAsync<GoalCompletion>(
-      'SELECT * FROM goal_completions WHERE goalId = ? AND completionDate >= ? AND completionDate <= ? ORDER BY completionDate DESC',
-      [goalId, startDate, endDate]
+      `SELECT gc.* FROM goal_completions gc
+       INNER JOIN goals g ON g.id = gc.goalId
+       WHERE gc.goalId = ? AND g.userId = ? AND gc.completionDate >= ? AND gc.completionDate <= ?
+       ORDER BY gc.completionDate DESC`,
+      [goalId, userId, startDate, endDate]
     );
   },
   
@@ -1220,12 +1231,26 @@ export const habitsDb = {
 export const habitCompletionsDb = {
   async getByHabitId(habitId: string): Promise<HabitCompletion[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<HabitCompletion>('SELECT * FROM habit_completions WHERE habitId = ? ORDER BY completedAt DESC', [habitId]);
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<HabitCompletion>(
+      `SELECT hc.* FROM habit_completions hc
+       INNER JOIN habits h ON h.id = hc.habitId
+       WHERE hc.habitId = ? AND h.userId = ?
+       ORDER BY hc.completedAt DESC`,
+      [habitId, userId]
+    );
   },
-  
+
   async getAll(): Promise<HabitCompletion[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<HabitCompletion>('SELECT * FROM habit_completions ORDER BY completedAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<HabitCompletion>(
+      `SELECT hc.* FROM habit_completions hc
+       INNER JOIN habits h ON h.id = hc.habitId
+       WHERE h.userId = ?
+       ORDER BY hc.completedAt DESC`,
+      [userId]
+    );
   },
   
   async create(completion: HabitCompletion): Promise<void> {

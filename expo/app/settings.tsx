@@ -1151,68 +1151,79 @@ export default function SettingsScreen() {
 
               <Text style={styles.legalSectionTitle}>3. Not Medical or Financial Advice</Text>
               <Text style={styles.legalText}>
-                Alchemize provides self-improvement tools (e.g., affirmations, habit tracking, fitness/diet logging, goal setting, journaling, finance tracking). The App does not provide medical, mental health, legal, or financial advice and is not a substitute for professional services. Always consult qualified professionals for advice specific to your situation.
+                Alchemize provides self-improvement tools (e.g., affirmations, habit tracking, fitness/diet logging, goal setting, journaling, finance tracking). The App does not provide medical, mental health, legal, or financial advice and is not a substitute for professional services. Alchemize is not a medical device and has not been evaluated by the FDA or any regulator. Do not use the App for medical diagnosis, treatment, or in an emergency — always consult qualified professionals, and call emergency services for emergencies.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>4. Your Account & Security</Text>
+              <Text style={styles.legalSectionTitle}>4. AI-Generated Content</Text>
+              <Text style={styles.legalText}>
+                Some features (including food/meal photo scanning, nutrition estimation, and workout suggestions) use artificial intelligence, including third-party AI service providers, to analyze content you submit and generate results. AI-generated content can be inaccurate, incomplete, or misleading. You are solely responsible for independently verifying any AI-generated output — especially nutrition, calorie, fitness, or financial figures — before relying on it. We disclaim all liability for decisions made based on AI-generated content.
+              </Text>
+
+              <Text style={styles.legalSectionTitle}>5. Apple Health (HealthKit)</Text>
+              <Text style={styles.legalText}>
+                If you connect Apple Health, we access workout, active energy, and exercise-minute data solely to power in-app fitness features. This data is never sold and is never used for advertising, marketing, or any purpose outside the features you enabled it for. You can disconnect Apple Health at any time in Settings.
+              </Text>
+
+              <Text style={styles.legalSectionTitle}>6. Your Account & Security</Text>
               <Text style={styles.legalText}>
                 You are responsible for maintaining the confidentiality of your login credentials and for all activity under your account. Notify us immediately if you suspect unauthorized access.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>5. Your Content</Text>
+              <Text style={styles.legalSectionTitle}>7. Your Content</Text>
               <Text style={styles.legalText}>
-                You may input content such as text entries, goals, journal notes, photos, and other materials (&quot;User Content&quot;). You retain ownership of your User Content. You grant Alchemize a limited license to store, process, and display your User Content solely to operate and improve the App.
+                You may input content such as text entries, goals, journal notes, photos, and other materials (&quot;User Content&quot;). You retain ownership of your User Content. You grant Alchemize a limited license to store, process (including via AI service providers, where applicable), and display your User Content solely to operate and improve the App.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>6. Acceptable Use</Text>
+              <Text style={styles.legalSectionTitle}>8. Acceptable Use</Text>
               <Text style={styles.legalText}>You agree not to:</Text>
               <Text style={styles.legalBullet}>• Use the App for unlawful purposes</Text>
               <Text style={styles.legalBullet}>• Attempt to hack, disrupt, or reverse engineer the App</Text>
               <Text style={styles.legalBullet}>• Upload malicious code or abuse the platform</Text>
               <Text style={styles.legalBullet}>• Infringe the rights of others</Text>
+              <Text style={styles.legalBullet}>• Submit content to AI features that is illegal, abusive, or violates others&apos; rights</Text>
 
-              <Text style={styles.legalSectionTitle}>7. Privacy</Text>
+              <Text style={styles.legalSectionTitle}>9. Privacy</Text>
               <Text style={styles.legalText}>
                 Your use of Alchemize is also governed by our Privacy Policy. Where these Terms and the Privacy Policy conflict, the Privacy Policy controls for privacy-related topics.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>8. Subscriptions & Payments (if applicable)</Text>
+              <Text style={styles.legalSectionTitle}>10. Subscriptions & Payments (if applicable)</Text>
               <Text style={styles.legalText}>
-                If Alchemize offers paid features, subscription terms, pricing, and billing details will be shown at purchase. Payments are processed by the relevant app store. Refunds follow the app store&apos;s refund policy unless otherwise required by law.
+                If Alchemize offers paid features, subscription terms, pricing, and billing details will be shown at purchase. Subscriptions auto-renew until cancelled. Payments are processed by the relevant app store (Apple App Store or Google Play). Manage or cancel anytime in your app store account settings. Refunds follow the app store&apos;s refund policy unless otherwise required by law.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>9. Changes to the App</Text>
+              <Text style={styles.legalSectionTitle}>11. Changes to the App</Text>
               <Text style={styles.legalText}>
                 We may update, modify, or discontinue features of the App at any time. We are not liable for any modifications, suspensions, or discontinuation.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>10. Disclaimer of Warranties</Text>
+              <Text style={styles.legalSectionTitle}>12. Disclaimer of Warranties</Text>
               <Text style={styles.legalText}>
                 The App is provided &quot;as is&quot; and &quot;as available.&quot; We make no warranties of any kind, express or implied, including fitness for a particular purpose and non-infringement.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>11. Limitation of Liability</Text>
+              <Text style={styles.legalSectionTitle}>13. Limitation of Liability</Text>
               <Text style={styles.legalText}>
-                To the maximum extent permitted by law, Alchemize and its creators will not be liable for indirect, incidental, special, consequential, or punitive damages, or any loss of data, profits, or revenue arising from your use of the App.
+                To the maximum extent permitted by law, Alchemize and its creators will not be liable for indirect, incidental, special, consequential, or punitive damages, or any loss of data, profits, or revenue arising from your use of the App, including reliance on AI-generated content or third-party services (Apple, Google, Supabase, RevenueCat, and AI providers).
               </Text>
 
-              <Text style={styles.legalSectionTitle}>12. Termination</Text>
+              <Text style={styles.legalSectionTitle}>14. Termination</Text>
               <Text style={styles.legalText}>
                 We may suspend or terminate access to the App if you violate these Terms or if required for security or legal reasons.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>13. Governing Law</Text>
+              <Text style={styles.legalSectionTitle}>15. Governing Law</Text>
               <Text style={styles.legalText}>
                 These Terms are governed by the laws of the jurisdiction where Alchemize is operated, without regard to conflict of law rules.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>14. Contact</Text>
+              <Text style={styles.legalSectionTitle}>16. Contact</Text>
               <Text style={styles.legalText}>
                 For support or legal questions, contact: support@alchemize.app
               </Text>
 
               <View style={styles.legalCreditWrap}>
-                <Text style={styles.legalCredit}>Development by CRF Enterprise</Text>
+                <Text style={styles.legalCredit}>Developed by FRC Enterprise</Text>
                 <Text style={styles.legalCredit}>Powered &amp; Designed by Metallicv1</Text>
               </View>
               <View style={styles.legalBottomPadding} />
@@ -1349,6 +1360,8 @@ export default function SettingsScreen() {
               <Text style={styles.legalBullet}>• Account info: name, email, login identifiers</Text>
               <Text style={styles.legalBullet}>• Profile info: profile photo (if you choose to upload), display name</Text>
               <Text style={styles.legalBullet}>• App content you create: affirmations, goals, habits, journal entries, logs (fitness, diet, finance), and similar entries</Text>
+              <Text style={styles.legalBullet}>• Photos and text you submit to AI-powered features (e.g. food/meal photo scanning, workout suggestions)</Text>
+              <Text style={styles.legalBullet}>• Apple Health (HealthKit) data, only if you choose to connect it: workouts, active energy, and exercise minutes</Text>
               <Text style={styles.legalBullet}>• Device/app data: app version, device type, crash logs, and performance metrics (for reliability and improvement)</Text>
 
               <Text style={styles.legalSectionTitle}>3. How We Use Information</Text>
@@ -1359,39 +1372,57 @@ export default function SettingsScreen() {
               <Text style={styles.legalBullet}>• Provide support and respond to requests</Text>
               <Text style={styles.legalBullet}>• Protect against fraud, abuse, or security threats</Text>
 
-              <Text style={styles.legalSectionTitle}>4. Sharing</Text>
+              <Text style={styles.legalSectionTitle}>4. AI Features & Third-Party Processing</Text>
+              <Text style={styles.legalText}>
+                Some features (such as food photo scanning and workout suggestions) use artificial intelligence to analyze content you submit. To provide these features, photos and text you submit may be sent to and processed by third-party AI service providers. AI-generated output (nutrition estimates, suggestions, generated text) can be inaccurate or incomplete and should be independently verified — it is not professional medical, nutritional, or financial advice.
+              </Text>
+
+              <Text style={styles.legalSectionTitle}>5. Apple Health (HealthKit) Data</Text>
+              <Text style={styles.legalText}>
+                If you choose to connect Apple Health, we read workout, active energy, and exercise-minute data solely to power in-app features like fitness sync and activity summaries. We do not sell HealthKit data, and we do not use it for advertising, marketing, or any purpose other than the features you enabled it for. HealthKit data stays associated with your account and is never shared with third parties beyond what is needed to operate the app.
+              </Text>
+
+              <Text style={styles.legalSectionTitle}>6. Sharing</Text>
               <Text style={styles.legalText}>
                 We do not sell your personal information. We may share limited information with:
               </Text>
-              <Text style={styles.legalBullet}>• Service providers that help operate the App (hosting, analytics, storage), under confidentiality obligations</Text>
+              <Text style={styles.legalBullet}>• Service providers that help operate the App (hosting, database, analytics, storage) under confidentiality obligations</Text>
+              <Text style={styles.legalBullet}>• AI service providers, for content you submit to AI-powered features</Text>
+              <Text style={styles.legalBullet}>• Payment and subscription processors (Apple, Google, RevenueCat), for purchase and subscription management</Text>
               <Text style={styles.legalBullet}>• Legal authorities if required by law or to protect safety and rights</Text>
 
-              <Text style={styles.legalSectionTitle}>5. Data Storage & Security</Text>
+              <Text style={styles.legalSectionTitle}>7. Data Storage & Security</Text>
               <Text style={styles.legalText}>
                 We use reasonable administrative, technical, and physical safeguards to protect your data. No system is 100% secure, so we cannot guarantee absolute security.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>6. Your Choices</Text>
+              <Text style={styles.legalSectionTitle}>8. Cookies & Tracking Technologies</Text>
+              <Text style={styles.legalText}>
+                Alchemize does not use advertising cookies, ad trackers, or third-party marketing pixels. On the web version of the App, we use browser local storage (not cookies) solely to keep you signed in between visits. We do not currently use analytics or behavioral tracking tools. If this changes, we will update this section before doing so.
+              </Text>
+
+              <Text style={styles.legalSectionTitle}>9. Your Choices</Text>
               <Text style={styles.legalBullet}>• You can update your profile name and photo in Settings</Text>
-              <Text style={styles.legalBullet}>• You can sign out at any time</Text>
+              <Text style={styles.legalBullet}>• You can disconnect Apple Health at any time in Settings</Text>
+              <Text style={styles.legalBullet}>• You can sign out at any time (this clears the local storage/session used to keep you signed in)</Text>
               <Text style={styles.legalBullet}>• You may request access, correction, or deletion of your data by contacting support@alchemize.app</Text>
 
-              <Text style={styles.legalSectionTitle}>7. Retention</Text>
+              <Text style={styles.legalSectionTitle}>10. Retention</Text>
               <Text style={styles.legalText}>
                 We retain personal information only as long as needed to provide the App and comply with legal obligations. You may request deletion.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>8. Children&apos;s Privacy</Text>
+              <Text style={styles.legalSectionTitle}>11. Children&apos;s Privacy</Text>
               <Text style={styles.legalText}>
                 Alchemize is not intended for children under 13. If we learn we collected data from a child under 13, we will delete it.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>9. Changes</Text>
+              <Text style={styles.legalSectionTitle}>12. Changes</Text>
               <Text style={styles.legalText}>
                 We may update this Privacy Policy from time to time. We will update the effective date when changes are made.
               </Text>
 
-              <Text style={styles.legalSectionTitle}>10. Contact</Text>
+              <Text style={styles.legalSectionTitle}>13. Contact</Text>
               <Text style={styles.legalText}>
                 Questions or requests: support@alchemize.app
               </Text>
