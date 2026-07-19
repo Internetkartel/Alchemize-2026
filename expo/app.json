@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FRC Enterprise - Alchemize",
-    "slug": "alchemize",
+    "slug": "alchemize-level-up",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -109,7 +109,14 @@
           "recordAudioAndroid": true
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Alchemize reads your Apple Health data (workouts, active energy, exercise minutes) to keep your fitness stats in sync.",
+          "NSHealthUpdateUsageDescription": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

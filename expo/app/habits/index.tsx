@@ -186,21 +186,21 @@ export default function HabitsScreen() {
 
   const completeTimer = (habit: Habit) => {
     const state = timerStates[habit.id];
-    if (state?.interval) {
-      clearInterval(state.interval);
-      timerIntervalsRef.current.delete(state.interval);
-    }
-
     const minutes = Math.floor((state?.elapsed || 0) / 60);
     const goalMinutes = habit.goalUnit === 'hours' ? habit.goal * 60 : habit.goal;
 
     if (minutes >= goalMinutes) {
+      if (state?.interval) {
+        clearInterval(state.interval);
+        timerIntervalsRef.current.delete(state.interval);
+      }
       completeHabitMutation.mutate({
         habitId: habit.id,
         value: minutes,
       });
       setTimerStates(prev => ({ ...prev, [habit.id]: { running: false, elapsed: 0 } }));
     } else {
+      // Goal not yet met — leave the timer running rather than silently stopping it.
       Alert.alert('Not Yet!', `You need to complete ${goalMinutes} ${habit.goalUnit} to log this habit.`);
     }
   };

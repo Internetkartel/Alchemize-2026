@@ -36,6 +36,7 @@ export interface GoalChecklistItem {
   goalId: string;
   text: string;
   isDone: boolean;
+  orderIndex: number;
 }
 
 export interface GoalCompletion {

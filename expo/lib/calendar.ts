@@ -143,6 +143,10 @@ export async function addAppointmentToCalendar(
     }
 
     const [hours, minutes] = time.split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      console.error('[Calendar] Invalid time string, expected "HH:mm":', time);
+      return null;
+    }
     const startDate = new Date(date);
     startDate.setHours(hours, minutes, 0, 0);
 

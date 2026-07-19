@@ -1,14 +1,20 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getSurrealDB, type User } from './surrealdb';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Only used when JWT_SECRET is unset (local dev). Randomly generated per process start,
+// so tokens are unpredictable but also invalidated on every restart — never rely on this in a
+// deployed environment. JWT_SECRET must be set in staging/production.
+const EPHEMERAL_DEV_SECRET = crypto.randomBytes(32).toString('hex');
+
 if (!JWT_SECRET) {
-  console.warn('[Auth] WARNING: JWT_SECRET not set. Using default for development only.');
+  console.warn('[Auth] WARNING: JWT_SECRET not set. Using a random per-process secret for development only.');
 }
 
-const getJwtSecret = () => JWT_SECRET || 'alchemize-dev-secret-' + (process.env.EXPO_PUBLIC_PROJECT_ID || 'local');
+const getJwtSecret = () => JWT_SECRET || EPHEMERAL_DEV_SECRET;
 const JWT_EXPIRES_IN = '30d';
 
 export interface AuthTokenPayload {

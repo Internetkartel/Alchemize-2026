@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Play, TrendingUp, Award, ChevronRight, Plus, Dumbbell } from 'lucide-react-native';
 import { workoutTemplatesDb, workoutSessionsDb, normalizedMetricsDb, fitnessGoalsDb, fitnessPlansDb, awardsDb } from '@/lib/db/fitness';
-import type { Award as AwardType } from '@/types';
+import type { Award as AwardType, WorkoutTemplate } from '@/types';
 import {
   seedWorkoutTemplates,
   seedAwards,
@@ -16,7 +16,6 @@ import {
   markActiveDay,
 } from '@/lib/fitness';
 import { usePedometer } from '@/hooks/use-pedometer';
-import type { WorkoutTemplate } from '@/types';
 
 function WorkoutCard({ workout, onPress }: { workout: WorkoutTemplate; onPress: () => void }) {
   return (

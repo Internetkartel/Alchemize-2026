@@ -57,7 +57,7 @@ export function shouldReconcileReminder(task: Task, now: number = Date.now()) {
 }
 
 export function getNextPriority(priority: Task['priority']) {
-  const priorities: Array<Task['priority']> = [null, 'low', 'medium', 'high'];
+  const priorities: Task['priority'][] = [null, 'low', 'medium', 'high'];
   const currentIndex = priorities.indexOf(priority);
   return priorities[(currentIndex + 1) % priorities.length];
 }

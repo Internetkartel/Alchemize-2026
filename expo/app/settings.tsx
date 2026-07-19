@@ -945,6 +945,19 @@ export default function SettingsScreen() {
           </View>
           <ChevronRight color="#666" size={20} />
         </PressableScale>
+
+        <PressableScale style={styles.settingRow} onPress={() => router.push('/bug-fixer' as any)} testID="bug-fixer-row">
+          <View style={styles.settingRowLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: 'rgba(167, 139, 250, 0.15)' }]}>
+              <Bug color="#a78bfa" size={20} />
+            </View>
+            <View style={styles.settingTextContainer}>
+              <Text style={styles.settingTitle}>Bug Fixer</Text>
+              <Text style={styles.settingSubtitle}>Diagnose and fix sign-in, sync, and subscription issues</Text>
+            </View>
+          </View>
+          <ChevronRight color="#666" size={20} />
+        </PressableScale>
       </View>
 
       {/* Data Section */}

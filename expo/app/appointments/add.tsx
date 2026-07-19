@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, Platform, KeyboardAvoidingView, Alert } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert } from 'react-native';
+
 import { Calendar, Clock, User, Briefcase, FileText, Check } from 'lucide-react-native';
 import { appointmentSupabase } from '@/services/appointments.service';
 import type { Appointment, AppointmentCategory } from '@/types';
@@ -173,7 +173,8 @@ export default function AddAppointmentScreen() {
       />
       <LinearGradient colors={['#0f0f1a', '#1a1a2e', '#16213e']} style={styles.gradient}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
           style={styles.keyboardView}
         >
           <ScrollView

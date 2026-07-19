@@ -8,9 +8,9 @@ export async function initSurrealDB() {
   try {
     db = new Surreal();
     
-    const endpoint = process.env.EXPO_PUBLIC_RORK_DB_ENDPOINT;
-    const namespace = process.env.EXPO_PUBLIC_RORK_DB_NAMESPACE;
-    const token = process.env.EXPO_PUBLIC_RORK_DB_TOKEN;
+    const endpoint = process.env.RORK_DB_ENDPOINT;
+    const namespace = process.env.RORK_DB_NAMESPACE;
+    const token = process.env.RORK_DB_TOKEN;
 
     if (!endpoint || !namespace || !token) {
       throw new Error('Missing SurrealDB configuration');

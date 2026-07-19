@@ -1,8 +1,24 @@
 import { Platform } from 'react-native';
+import type { CustomerInfo, PurchasesStoreProduct, PurchasesStoreProductDiscount } from 'react-native-purchases';
 
 export const ENTITLEMENT_ID = 'pro';
 
-const API_KEY = 'test_fWTiPXsQgZVLfKlkuqfYnBRtuLG';
+const DEV_FALLBACK_API_KEY = 'test_fWTiPXsQgZVLfKlkuqfYnBRtuLG';
+const API_KEY =
+  Platform.OS === 'ios'
+    ? process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS
+    : process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
+
+function getApiKey(): string {
+  if (API_KEY) return API_KEY;
+  if (__DEV__) {
+    console.warn('[Purchases] RevenueCat API key env var not set, using sandbox test key for development only');
+    return DEV_FALLBACK_API_KEY;
+  }
+  throw new Error(
+    'RevenueCat API key is not configured. Set EXPO_PUBLIC_REVENUECAT_API_KEY_IOS / EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID.'
+  );
+}
 
 export function isPurchasesSupported(): boolean {
   return Platform.OS === 'ios' || Platform.OS === 'android';
@@ -18,7 +34,7 @@ export async function initPurchases(appUserId?: string | null): Promise<boolean>
   if (!isPurchasesSupported()) return false;
   try {
     const Purchases = await getPurchases();
-    Purchases.configure({ apiKey: API_KEY, appUserID: appUserId ?? undefined });
+    Purchases.configure({ apiKey: getApiKey(), appUserID: appUserId ?? undefined });
     // Enable debug logs in development
     if (__DEV__) {
       Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE);
@@ -44,7 +60,7 @@ export async function checkProEntitlement(): Promise<boolean> {
 }
 
 /** Get full customer info (including all entitlements, subscriptions, etc.) */
-export async function getCustomerInfo(): Promise<Record<string, unknown> | null> {
+export async function getCustomerInfo(): Promise<CustomerInfo | null> {
   if (!isPurchasesSupported()) return null;
   try {
     const Purchases = await getPurchases();
@@ -177,10 +193,13 @@ export async function syncPurchases(): Promise<void> {
 }
 
 /** Get available discounts / intro offers for a product */
-export async function getPromotionalOffer(productIdentifier: string, discountIdentifier: string): Promise<unknown | null> {
+export async function getPromotionalOffer(
+  product: PurchasesStoreProduct,
+  discount: PurchasesStoreProductDiscount,
+): Promise<unknown | null> {
   try {
     const Purchases = await getPurchases();
-    return await Purchases.getPromotionalOffer(productIdentifier, discountIdentifier);
+    return await Purchases.getPromotionalOffer(product, discount);
   } catch (error: unknown) {
     console.error('[Purchases] getPromotionalOffer failed:', error);
     return null;
@@ -198,7 +217,7 @@ export async function setAttributes(attributes: Record<string, string | number |
 }
 
 /** Set a custom user ID (alias for login) */
-export async function logIn(appUserId: string): Promise<Record<string, unknown> | null> {
+export async function logIn(appUserId: string): Promise<CustomerInfo | null> {
   try {
     const Purchases = await getPurchases();
     const { customerInfo } = await Purchases.logIn(appUserId);

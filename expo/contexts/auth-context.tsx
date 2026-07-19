@@ -4,9 +4,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
+import bcrypt from 'bcryptjs';
 
 import { setCurrentUserId } from '@/lib/db/core';
 import { secureStorage } from '@/lib/secure-storage';
+
+async function generateToken(userId: string): Promise<string> {
+  const random = await Crypto.getRandomBytesAsync(32);
+  const hex = Array.from(random).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${userId}.${hex}`;
+}
 
 const AUTH_STORAGE_KEY = '@alchemize_auth';
 const AUTH_SECURE_KEY = 'alchemize_auth_session';
@@ -28,7 +35,9 @@ interface StoredUser {
   id: string;
   email: string;
   name: string;
-  password: string;
+  passwordHash?: string;
+  /** @deprecated legacy plaintext field from before password hashing was added; migrated on next successful login */
+  password?: string;
 }
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
@@ -111,16 +120,29 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       
       const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      
+
       if (!user) {
         return { success: false, error: 'User not found. Please sign up first.' };
       }
-      
-      if (user.password !== password) {
+
+      let isValid: boolean;
+      if (user.passwordHash) {
+        isValid = await bcrypt.compare(password, user.passwordHash);
+      } else {
+        // Legacy account created before password hashing was added.
+        isValid = user.password === password;
+        if (isValid) {
+          user.passwordHash = await bcrypt.hash(password, 10);
+          delete user.password;
+          await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+        }
+      }
+
+      if (!isValid) {
         return { success: false, error: 'Invalid password' };
       }
 
-      const token = `token_${user.id}_${Date.now()}`;
+      const token = await generateToken(user.id);
       const newAuthState: AuthState = {
         user: {
           id: user.id,
@@ -168,17 +190,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       }
       
       const userId = `user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const passwordHash = await bcrypt.hash(password, 10);
       const newUser: StoredUser = {
         id: userId,
         email,
         name,
-        password,
+        passwordHash,
       };
-      
+
       users.push(newUser);
       await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
 
-      const token = `token_${userId}_${Date.now()}`;
+      const token = await generateToken(userId);
       const newAuthState: AuthState = {
         user: {
           id: userId,
@@ -226,6 +249,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce,
       });
 
       console.log('[Auth] Apple credential received:', credential.user);
@@ -253,7 +277,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           id: appleUserId,
           email: appleEmail,
           name: appleName,
-          password: '',
         };
         users.push(newUser);
         await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
@@ -266,7 +289,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       }
 
-      const token = `apple_token_${appleUserId}_${Date.now()}`;
+      const token = await generateToken(existingUser.id);
       const newAuthState: AuthState = {
         user: {
           id: existingUser.id,

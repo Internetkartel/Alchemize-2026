@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
-import { Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Alert, Text } from 'react-native';
+
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,7 +35,7 @@ export default function CustomerCenterScreen() {
       await syncPurchases();
       await refresh();
       Alert.alert('Success', 'Purchase data synced successfully.');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to sync purchases. Please try again.');
     } finally {
       setBusy(null);
@@ -67,11 +67,9 @@ export default function CustomerCenterScreen() {
     });
   };
 
-  const activeEntitlements =
-    (customerInfo?.entitlements as Record<string, { active: boolean; expirationDate?: string }>)
-      ?.active || {};
+  const activeEntitlements = customerInfo?.entitlements.active ?? {};
 
-  const entitlementEntries = Object.entries(activeEntitlements).filter(([, v]) => v.active);
+  const entitlementEntries = Object.entries(activeEntitlements);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
@@ -104,7 +102,7 @@ export default function CustomerCenterScreen() {
             <View key={key} style={styles.entitlementRow}>
               <Text style={styles.entitlementName}>{key}</Text>
               <Text style={styles.entitlementExpiry}>
-                Expires: {formatDate((value as { expirationDate?: string }).expirationDate)}
+                Expires: {formatDate(value.expirationDate ?? undefined)}
               </Text>
             </View>
           ))}

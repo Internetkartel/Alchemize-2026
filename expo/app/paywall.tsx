@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Text, ScrollView, Alert, ActivityIndicator, Image, Linking } from 'react-native';
+import { View, StyleSheet, Text, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -111,15 +111,6 @@ export default function PaywallScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Image */}
-        <View style={styles.heroWrap}>
-          <Image
-            source={require('../assets/images/paywall-hero.png')}
-            style={styles.heroImage}
-            resizeMode="contain"
-          />
-        </View>
-
         <View style={styles.iconWrap}>
           <Crown color="#a78bfa" size={32} />
         </View>
@@ -185,16 +176,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     alignItems: 'center',
-  },
-  heroWrap: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  heroImage: {
-    width: 320,
-    height: 560,
-    borderRadius: 20,
   },
   iconWrap: {
     width: 56,

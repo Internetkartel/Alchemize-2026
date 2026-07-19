@@ -69,15 +69,15 @@ export default function GoalDetailScreen() {
 
   const moveItemMutation = useMutation({
     mutationFn: async ({ itemId, direction }: { itemId: string; direction: 'up' | 'down' }) => {
-      const items = [...checklistItems];
+      const items = [...checklistItems].sort((a, b) => a.orderIndex - b.orderIndex);
       const idx = items.findIndex(i => i.id === itemId);
       if (idx === -1) return;
       const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
       if (swapIdx < 0 || swapIdx >= items.length) return;
-      [items[idx], items[swapIdx]] = [items[swapIdx], items[idx]];
-      for (const item of items) {
-        await goalChecklistDb.update(item);
-      }
+      const current = items[idx];
+      const swapped = items[swapIdx];
+      await goalChecklistDb.update({ ...current, orderIndex: swapped.orderIndex });
+      await goalChecklistDb.update({ ...swapped, orderIndex: current.orderIndex });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goal-checklist', id] });
@@ -149,6 +149,7 @@ export default function GoalDetailScreen() {
       goalId: id!,
       text: newItemText.trim(),
       isDone: false,
+      orderIndex: checklistItems.length,
     };
 
     addItemMutation.mutate(item);

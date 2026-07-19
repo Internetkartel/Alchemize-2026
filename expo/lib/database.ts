@@ -368,6 +368,7 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase | null> {
       goalId TEXT NOT NULL,
       text TEXT NOT NULL,
       isDone INTEGER NOT NULL,
+      orderIndex INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (goalId) REFERENCES goals(id) ON DELETE CASCADE
     );
     
@@ -913,7 +914,18 @@ if (!gratitudeHasReflection) {
         console.log('[Database] manualMacros column may already exist:', e);
       }
     }
-    
+
+    const checklistItemsHaveOrderIndex = await checkColumn('goal_checklist_items', 'orderIndex');
+    if (!checklistItemsHaveOrderIndex) {
+      console.log('[Database] Adding orderIndex column to goal_checklist_items');
+      try {
+        await database.execAsync('ALTER TABLE goal_checklist_items ADD COLUMN orderIndex INTEGER NOT NULL DEFAULT 0');
+        console.log('[Database] Successfully added orderIndex column');
+      } catch (e) {
+        console.log('[Database] orderIndex column may already exist:', e);
+      }
+    }
+
     console.log('[Database] Migrations completed');
   } catch (error) {
     console.error('[Database] Migration error:', error);
@@ -1116,25 +1128,25 @@ export const goalsDb = {
 export const goalChecklistDb = {
   async getByGoalId(goalId: string): Promise<GoalChecklistItem[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<GoalChecklistItem>('SELECT * FROM goal_checklist_items WHERE goalId = ?', [goalId]);
+    return database.getAllAsync<GoalChecklistItem>('SELECT * FROM goal_checklist_items WHERE goalId = ? ORDER BY orderIndex', [goalId]);
   },
-  
+
   async create(item: GoalChecklistItem): Promise<void> {
     const database = await ensureDatabase();
     await database.runAsync(
-      'INSERT INTO goal_checklist_items (id, goalId, text, isDone) VALUES (?, ?, ?, ?)',
-      [item.id, item.goalId, item.text, item.isDone ? 1 : 0]
+      'INSERT INTO goal_checklist_items (id, goalId, text, isDone, orderIndex) VALUES (?, ?, ?, ?, ?)',
+      [item.id, item.goalId, item.text, item.isDone ? 1 : 0, item.orderIndex]
     );
   },
-  
+
   async update(item: GoalChecklistItem): Promise<void> {
     const database = await ensureDatabase();
     await database.runAsync(
-      'UPDATE goal_checklist_items SET text = ?, isDone = ? WHERE id = ?',
-      [item.text, item.isDone ? 1 : 0, item.id]
+      'UPDATE goal_checklist_items SET text = ?, isDone = ?, orderIndex = ? WHERE id = ?',
+      [item.text, item.isDone ? 1 : 0, item.orderIndex, item.id]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
     await database.runAsync('DELETE FROM goal_checklist_items WHERE id = ?', [id]);
@@ -1345,20 +1357,23 @@ export const financialNoteDb = {
 export const mealsDb = {
   async getAll(): Promise<Meal[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<Meal>('SELECT * FROM meals ORDER BY date DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<Meal>('SELECT * FROM meals WHERE userId = ? ORDER BY date DESC', [userId]);
   },
-  
+
   async create(meal: Meal): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO meals (id, date, name, calories, protein, carbs, fat, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [meal.id, meal.date, meal.name, meal.calories, meal.protein, meal.carbs, meal.fat, meal.notes]
+      'INSERT INTO meals (id, userId, date, name, calories, protein, carbs, fat, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [meal.id, userId, meal.date, meal.name, meal.calories, meal.protein, meal.carbs, meal.fat, meal.notes]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM meals WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM meals WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
@@ -1404,39 +1419,44 @@ export const foodLogsDb = {
 export const savedFoodsDb = {
   async getAll(): Promise<SavedFood[]> {
     const database = await ensureDatabase();
-    const rows = await database.getAllAsync<any>('SELECT * FROM saved_foods ORDER BY foodName');
+    const userId = getCurrentUserId() ?? 'guest';
+    const rows = await database.getAllAsync<any>('SELECT * FROM saved_foods WHERE userId = ? ORDER BY foodName', [userId]);
     return rows.map(row => ({
       ...row,
       tags: safeJsonParse(row.tags, []),
     }));
   },
-  
+
   async create(food: SavedFood): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO saved_foods (id, foodName, servingDescription, calories, proteinGrams, carbGrams, fatGrams, sugarGrams, fiberGrams, tags, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [food.id, food.foodName, food.servingDescription, food.calories, food.proteinGrams, food.carbGrams, food.fatGrams, food.sugarGrams, food.fiberGrams, JSON.stringify(food.tags), food.createdAt]
+      'INSERT INTO saved_foods (id, userId, foodName, servingDescription, calories, proteinGrams, carbGrams, fatGrams, sugarGrams, fiberGrams, tags, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [food.id, userId, food.foodName, food.servingDescription, food.calories, food.proteinGrams, food.carbGrams, food.fatGrams, food.sugarGrams, food.fiberGrams, JSON.stringify(food.tags), food.createdAt]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM saved_foods WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM saved_foods WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const nutritionGoalDb = {
   async get(): Promise<NutritionGoal | null> {
     const database = await ensureDatabase();
-    return database.getFirstAsync<NutritionGoal>('SELECT * FROM nutrition_goals LIMIT 1');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getFirstAsync<NutritionGoal>('SELECT * FROM nutrition_goals WHERE userId = ? LIMIT 1', [userId]);
   },
-  
+
   async createOrUpdate(goal: NutritionGoal): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      `INSERT OR REPLACE INTO nutrition_goals (id, dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailySugar, dailyFiber, updatedAt) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [goal.id, goal.dailyCalories, goal.dailyProtein, goal.dailyCarbs, goal.dailyFat, goal.dailySugar, goal.dailyFiber, goal.updatedAt]
+      `INSERT OR REPLACE INTO nutrition_goals (id, userId, dailyCalories, dailyProtein, dailyCarbs, dailyFat, dailySugar, dailyFiber, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [goal.id, userId, goal.dailyCalories, goal.dailyProtein, goal.dailyCarbs, goal.dailyFat, goal.dailySugar, goal.dailyFiber, goal.updatedAt]
     );
   },
 };
@@ -1444,20 +1464,23 @@ export const nutritionGoalDb = {
 export const plannedMealsDb = {
   async getAll(): Promise<PlannedMeal[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<PlannedMeal>('SELECT * FROM planned_meals ORDER BY date, slot');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<PlannedMeal>('SELECT * FROM planned_meals WHERE userId = ? ORDER BY date, slot', [userId]);
   },
-  
+
   async create(meal: PlannedMeal): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO planned_meals (id, date, slot, name, notes) VALUES (?, ?, ?, ?, ?)',
-      [meal.id, meal.date, meal.slot, meal.name, meal.notes]
+      'INSERT INTO planned_meals (id, userId, date, slot, name, notes) VALUES (?, ?, ?, ?, ?, ?)',
+      [meal.id, userId, meal.date, meal.slot, meal.name, meal.notes]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM planned_meals WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM planned_meals WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
@@ -1579,40 +1602,46 @@ export const affirmationsDb = {
 export const workoutsDb = {
   async getAll(): Promise<Workout[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<Workout>('SELECT * FROM workouts ORDER BY date DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<Workout>('SELECT * FROM workouts WHERE userId = ? ORDER BY date DESC', [userId]);
   },
-  
+
   async create(workout: Workout): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO workouts (id, type, durationMinutes, caloriesBurned, notes, date, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [workout.id, workout.type, workout.durationMinutes, workout.caloriesBurned, workout.notes, workout.date, workout.createdAt]
+      'INSERT INTO workouts (id, userId, type, durationMinutes, caloriesBurned, notes, date, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [workout.id, userId, workout.type, workout.durationMinutes, workout.caloriesBurned, workout.notes, workout.date, workout.createdAt]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM workouts WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM workouts WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const bodyMetricsDb = {
   async getAll(): Promise<BodyMetric[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<BodyMetric>('SELECT * FROM body_metrics ORDER BY date DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<BodyMetric>('SELECT * FROM body_metrics WHERE userId = ? ORDER BY date DESC', [userId]);
   },
-  
+
   async create(metric: BodyMetric): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO body_metrics (id, date, weight, waist, chest, hips, arms, thighs, bodyFatPercentage, muscleMass, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [metric.id, metric.date, metric.weight, metric.waist, metric.chest, metric.hips, metric.arms, metric.thighs, metric.bodyFatPercentage, metric.muscleMass, metric.notes, metric.createdAt]
+      'INSERT INTO body_metrics (id, userId, date, weight, waist, chest, hips, arms, thighs, bodyFatPercentage, muscleMass, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [metric.id, userId, metric.date, metric.weight, metric.waist, metric.chest, metric.hips, metric.arms, metric.thighs, metric.bodyFatPercentage, metric.muscleMass, metric.notes, metric.createdAt]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM body_metrics WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM body_metrics WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
@@ -1655,7 +1684,8 @@ export const appointmentsDb = {
 export const userNutritionProfileDb = {
   async get(): Promise<UserNutritionProfile | null> {
     const database = await ensureDatabase();
-    const row = await database.getFirstAsync<any>('SELECT * FROM user_nutrition_profiles LIMIT 1');
+    const userId = getCurrentUserId() ?? 'guest';
+    const row = await database.getFirstAsync<any>('SELECT * FROM user_nutrition_profiles WHERE userId = ? LIMIT 1', [userId]);
     if (!row) return null;
     return {
       ...row,
@@ -1677,209 +1707,237 @@ export const userNutritionProfileDb = {
 export const waterLogsDb = {
   async getAll(): Promise<WaterLog[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<WaterLog>('SELECT * FROM water_logs ORDER BY loggedAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<WaterLog>('SELECT * FROM water_logs WHERE userId = ? ORDER BY loggedAt DESC', [userId]);
   },
-  
+
   async getByDate(startOfDay: number, endOfDay: number): Promise<WaterLog[]> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     return database.getAllAsync<WaterLog>(
-      'SELECT * FROM water_logs WHERE loggedAt >= ? AND loggedAt < ? ORDER BY loggedAt DESC',
-      [startOfDay, endOfDay]
+      'SELECT * FROM water_logs WHERE userId = ? AND loggedAt >= ? AND loggedAt < ? ORDER BY loggedAt DESC',
+      [userId, startOfDay, endOfDay]
     );
   },
-  
+
   async create(log: WaterLog): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO water_logs (id, amount, unit, loggedAt) VALUES (?, ?, ?, ?)',
-      [log.id, log.amount, log.unit, log.loggedAt]
+      'INSERT INTO water_logs (id, userId, amount, unit, loggedAt) VALUES (?, ?, ?, ?, ?)',
+      [log.id, userId, log.amount, log.unit, log.loggedAt]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM water_logs WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM water_logs WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const mealPrepPlansDb = {
   async getAll(): Promise<MealPrepPlan[]> {
     const database = await ensureDatabase();
-    const rows = await database.getAllAsync<any>('SELECT * FROM meal_prep_plans ORDER BY weekStartDate, dayOfWeek, mealType');
+    const userId = getCurrentUserId() ?? 'guest';
+    const rows = await database.getAllAsync<any>('SELECT * FROM meal_prep_plans WHERE userId = ? ORDER BY weekStartDate, dayOfWeek, mealType', [userId]);
     return rows.map(row => ({
       ...row,
       isCompleted: Boolean(row.isCompleted),
     }));
   },
-  
+
   async getByWeek(weekStartDate: number): Promise<MealPrepPlan[]> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     const rows = await database.getAllAsync<any>(
-      'SELECT * FROM meal_prep_plans WHERE weekStartDate = ? ORDER BY dayOfWeek, mealType',
-      [weekStartDate]
+      'SELECT * FROM meal_prep_plans WHERE userId = ? AND weekStartDate = ? ORDER BY dayOfWeek, mealType',
+      [userId, weekStartDate]
     );
     return rows.map(row => ({
       ...row,
       isCompleted: Boolean(row.isCompleted),
     }));
   },
-  
+
   async create(plan: MealPrepPlan): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO meal_prep_plans (id, weekStartDate, dayOfWeek, mealType, foodName, calories, protein, carbs, fat, servingSize, notes, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [plan.id, plan.weekStartDate, plan.dayOfWeek, plan.mealType, plan.foodName, plan.calories, plan.protein, plan.carbs, plan.fat, plan.servingSize, plan.notes, plan.isCompleted ? 1 : 0, plan.createdAt]
+      'INSERT INTO meal_prep_plans (id, userId, weekStartDate, dayOfWeek, mealType, foodName, calories, protein, carbs, fat, servingSize, notes, isCompleted, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [plan.id, userId, plan.weekStartDate, plan.dayOfWeek, plan.mealType, plan.foodName, plan.calories, plan.protein, plan.carbs, plan.fat, plan.servingSize, plan.notes, plan.isCompleted ? 1 : 0, plan.createdAt]
     );
   },
-  
+
   async update(plan: MealPrepPlan): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE meal_prep_plans SET foodName = ?, calories = ?, protein = ?, carbs = ?, fat = ?, servingSize = ?, notes = ?, isCompleted = ? WHERE id = ?',
-      [plan.foodName, plan.calories, plan.protein, plan.carbs, plan.fat, plan.servingSize, plan.notes, plan.isCompleted ? 1 : 0, plan.id]
+      'UPDATE meal_prep_plans SET foodName = ?, calories = ?, protein = ?, carbs = ?, fat = ?, servingSize = ?, notes = ?, isCompleted = ? WHERE id = ? AND userId = ?',
+      [plan.foodName, plan.calories, plan.protein, plan.carbs, plan.fat, plan.servingSize, plan.notes, plan.isCompleted ? 1 : 0, plan.id, userId]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM meal_prep_plans WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM meal_prep_plans WHERE id = ? AND userId = ?', [id, userId]);
   },
-  
+
   async deleteByWeek(weekStartDate: number): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM meal_prep_plans WHERE weekStartDate = ?', [weekStartDate]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM meal_prep_plans WHERE userId = ? AND weekStartDate = ?', [userId, weekStartDate]);
   },
 };
 
 export const fitnessGoalsDb = {
   async getAll(): Promise<FitnessGoal[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<FitnessGoal>('SELECT * FROM fitness_goals ORDER BY createdAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<FitnessGoal>('SELECT * FROM fitness_goals WHERE userId = ? ORDER BY createdAt DESC', [userId]);
   },
-  
+
   async create(goal: FitnessGoal): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO fitness_goals (id, metric, dailyTarget, createdAt) VALUES (?, ?, ?, ?)',
-      [goal.id, goal.metric, goal.dailyTarget, goal.createdAt]
+      'INSERT INTO fitness_goals (id, userId, metric, dailyTarget, createdAt) VALUES (?, ?, ?, ?, ?)',
+      [goal.id, userId, goal.metric, goal.dailyTarget, goal.createdAt]
     );
   },
-  
+
   async update(goal: FitnessGoal): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE fitness_goals SET metric = ?, dailyTarget = ? WHERE id = ?',
-      [goal.metric, goal.dailyTarget, goal.id]
+      'UPDATE fitness_goals SET metric = ?, dailyTarget = ? WHERE id = ? AND userId = ?',
+      [goal.metric, goal.dailyTarget, goal.id, userId]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM fitness_goals WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM fitness_goals WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const workoutTemplatesDb = {
   async getAll(): Promise<WorkoutTemplate[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<WorkoutTemplate>('SELECT * FROM workout_templates');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<WorkoutTemplate>('SELECT * FROM workout_templates WHERE userId = ?', [userId]);
   },
-  
+
   async getById(id: string): Promise<WorkoutTemplate | null> {
     const database = await ensureDatabase();
-    return database.getFirstAsync<WorkoutTemplate>('SELECT * FROM workout_templates WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getFirstAsync<WorkoutTemplate>('SELECT * FROM workout_templates WHERE id = ? AND userId = ?', [id, userId]);
   },
-  
+
   async create(template: WorkoutTemplate): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO workout_templates (id, title, category, durationMinutes, intensity, equipment, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [template.id, template.title, template.category, template.durationMinutes, template.intensity, template.equipment, template.description]
+      'INSERT INTO workout_templates (id, userId, title, category, durationMinutes, intensity, equipment, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [template.id, userId, template.title, template.category, template.durationMinutes, template.intensity, template.equipment, template.description]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM workout_templates WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM workout_templates WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const workoutSessionsDb = {
   async getAll(): Promise<WorkoutSession[]> {
     const database = await ensureDatabase();
-    const rows = await database.getAllAsync<any>('SELECT * FROM workout_sessions ORDER BY startedAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    const rows = await database.getAllAsync<any>('SELECT * FROM workout_sessions WHERE userId = ? ORDER BY startedAt DESC', [userId]);
     return rows.map(row => ({
       ...row,
       completed: Boolean(row.completed),
     }));
   },
-  
+
   async getById(id: string): Promise<WorkoutSession | null> {
     const database = await ensureDatabase();
-    const row = await database.getFirstAsync<any>('SELECT * FROM workout_sessions WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    const row = await database.getFirstAsync<any>('SELECT * FROM workout_sessions WHERE id = ? AND userId = ?', [id, userId]);
     if (!row) return null;
     return {
       ...row,
       completed: Boolean(row.completed),
     };
   },
-  
+
   async create(session: WorkoutSession): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO workout_sessions (id, templateId, startedAt, endedAt, durationMinutes, completed, caloriesEstimate, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [session.id, session.templateId, session.startedAt, session.endedAt, session.durationMinutes, session.completed ? 1 : 0, session.caloriesEstimate, session.source]
+      'INSERT INTO workout_sessions (id, userId, templateId, startedAt, endedAt, durationMinutes, completed, caloriesEstimate, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [session.id, userId, session.templateId, session.startedAt, session.endedAt, session.durationMinutes, session.completed ? 1 : 0, session.caloriesEstimate, session.source]
     );
   },
-  
+
   async update(session: WorkoutSession): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE workout_sessions SET endedAt = ?, durationMinutes = ?, completed = ?, caloriesEstimate = ? WHERE id = ?',
-      [session.endedAt, session.durationMinutes, session.completed ? 1 : 0, session.caloriesEstimate, session.id]
+      'UPDATE workout_sessions SET endedAt = ?, durationMinutes = ?, completed = ?, caloriesEstimate = ? WHERE id = ? AND userId = ?',
+      [session.endedAt, session.durationMinutes, session.completed ? 1 : 0, session.caloriesEstimate, session.id, userId]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM workout_sessions WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM workout_sessions WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const normalizedMetricsDb = {
   async getAll(): Promise<NormalizedMetric[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<NormalizedMetric>('SELECT * FROM normalized_metrics ORDER BY date DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<NormalizedMetric>('SELECT * FROM normalized_metrics WHERE userId = ? ORDER BY date DESC', [userId]);
   },
-  
+
   async getByDate(date: string): Promise<NormalizedMetric | null> {
     const database = await ensureDatabase();
-    return database.getFirstAsync<NormalizedMetric>('SELECT * FROM normalized_metrics WHERE date = ?', [date]);
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getFirstAsync<NormalizedMetric>('SELECT * FROM normalized_metrics WHERE date = ? AND userId = ?', [date, userId]);
   },
-  
+
   async create(metric: NormalizedMetric): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO normalized_metrics (id, date, activeMinutes, caloriesActive, steps, source, deviceType) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [metric.id, metric.date, metric.activeMinutes, metric.caloriesActive, metric.steps, metric.source, metric.deviceType]
+      'INSERT INTO normalized_metrics (id, userId, date, activeMinutes, caloriesActive, steps, source, deviceType) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [metric.id, userId, metric.date, metric.activeMinutes, metric.caloriesActive, metric.steps, metric.source, metric.deviceType]
     );
   },
-  
+
   async update(metric: NormalizedMetric): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE normalized_metrics SET activeMinutes = ?, caloriesActive = ?, steps = ? WHERE date = ?',
-      [metric.activeMinutes, metric.caloriesActive, metric.steps, metric.date]
+      'UPDATE normalized_metrics SET activeMinutes = ?, caloriesActive = ?, steps = ? WHERE date = ? AND userId = ?',
+      [metric.activeMinutes, metric.caloriesActive, metric.steps, metric.date, userId]
     );
   },
-  
+
   async upsert(metric: NormalizedMetric): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     const existing = await this.getByDate(metric.date);
     if (existing) {
       await database.runAsync(
-        'UPDATE normalized_metrics SET activeMinutes = activeMinutes + ?, caloriesActive = caloriesActive + ?, steps = steps + ? WHERE date = ?',
-        [metric.activeMinutes, metric.caloriesActive, metric.steps, metric.date]
+        'UPDATE normalized_metrics SET activeMinutes = activeMinutes + ?, caloriesActive = caloriesActive + ?, steps = steps + ? WHERE date = ? AND userId = ?',
+        [metric.activeMinutes, metric.caloriesActive, metric.steps, metric.date, userId]
       );
     } else {
       await this.create(metric);
@@ -1890,17 +1948,19 @@ export const normalizedMetricsDb = {
 export const fitnessPlansDb = {
   async getAll(): Promise<FitnessPlan[]> {
     const database = await ensureDatabase();
-    const rows = await database.getAllAsync<any>('SELECT * FROM fitness_plans ORDER BY createdAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    const rows = await database.getAllAsync<any>('SELECT * FROM fitness_plans WHERE userId = ? ORDER BY createdAt DESC', [userId]);
     return rows.map(row => ({
       ...row,
       preferredCategories: safeJsonParse(row.preferredCategories, []),
       active: Boolean(row.active),
     }));
   },
-  
+
   async getActive(): Promise<FitnessPlan | null> {
     const database = await ensureDatabase();
-    const row = await database.getFirstAsync<any>('SELECT * FROM fitness_plans WHERE active = 1 LIMIT 1');
+    const userId = getCurrentUserId() ?? 'guest';
+    const row = await database.getFirstAsync<any>('SELECT * FROM fitness_plans WHERE active = 1 AND userId = ? LIMIT 1', [userId]);
     if (!row) return null;
     return {
       ...row,
@@ -1908,59 +1968,66 @@ export const fitnessPlansDb = {
       active: Boolean(row.active),
     };
   },
-  
+
   async create(plan: FitnessPlan): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     if (plan.active) {
-      await database.runAsync('UPDATE fitness_plans SET active = 0');
+      await database.runAsync('UPDATE fitness_plans SET active = 0 WHERE userId = ?', [userId]);
     }
     await database.runAsync(
-      'INSERT INTO fitness_plans (id, name, daysPerWeek, preferredCategories, durationRangeMin, durationRangeMax, intensity, equipment, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [plan.id, plan.name, plan.daysPerWeek, JSON.stringify(plan.preferredCategories), plan.durationRangeMin, plan.durationRangeMax, plan.intensity, plan.equipment, plan.active ? 1 : 0, plan.createdAt]
+      'INSERT INTO fitness_plans (id, userId, name, daysPerWeek, preferredCategories, durationRangeMin, durationRangeMax, intensity, equipment, active, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [plan.id, userId, plan.name, plan.daysPerWeek, JSON.stringify(plan.preferredCategories), plan.durationRangeMin, plan.durationRangeMax, plan.intensity, plan.equipment, plan.active ? 1 : 0, plan.createdAt]
     );
   },
-  
+
   async update(plan: FitnessPlan): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     if (plan.active) {
-      await database.runAsync('UPDATE fitness_plans SET active = 0 WHERE id != ?', [plan.id]);
+      await database.runAsync('UPDATE fitness_plans SET active = 0 WHERE id != ? AND userId = ?', [plan.id, userId]);
     }
     await database.runAsync(
-      'UPDATE fitness_plans SET name = ?, daysPerWeek = ?, preferredCategories = ?, durationRangeMin = ?, durationRangeMax = ?, intensity = ?, equipment = ?, active = ? WHERE id = ?',
-      [plan.name, plan.daysPerWeek, JSON.stringify(plan.preferredCategories), plan.durationRangeMin, plan.durationRangeMax, plan.intensity, plan.equipment, plan.active ? 1 : 0, plan.id]
+      'UPDATE fitness_plans SET name = ?, daysPerWeek = ?, preferredCategories = ?, durationRangeMin = ?, durationRangeMax = ?, intensity = ?, equipment = ?, active = ? WHERE id = ? AND userId = ?',
+      [plan.name, plan.daysPerWeek, JSON.stringify(plan.preferredCategories), plan.durationRangeMin, plan.durationRangeMax, plan.intensity, plan.equipment, plan.active ? 1 : 0, plan.id, userId]
     );
   },
-  
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM fitness_plans WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM fitness_plans WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 
 export const awardsDb = {
   async getAll(): Promise<Award[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<Award>('SELECT * FROM awards ORDER BY earnedAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<Award>('SELECT * FROM awards WHERE userId = ? ORDER BY earnedAt DESC', [userId]);
   },
-  
+
   async getEarned(): Promise<Award[]> {
     const database = await ensureDatabase();
-    return database.getAllAsync<Award>('SELECT * FROM awards WHERE earnedAt IS NOT NULL ORDER BY earnedAt DESC');
+    const userId = getCurrentUserId() ?? 'guest';
+    return database.getAllAsync<Award>('SELECT * FROM awards WHERE userId = ? AND earnedAt IS NOT NULL ORDER BY earnedAt DESC', [userId]);
   },
-  
+
   async create(award: Award): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT OR IGNORE INTO awards (id, code, title, description, earnedAt) VALUES (?, ?, ?, ?, ?)',
-      [award.id, award.code, award.title, award.description, award.earnedAt]
+      'INSERT OR IGNORE INTO awards (id, userId, code, title, description, earnedAt) VALUES (?, ?, ?, ?, ?, ?)',
+      [award.id, userId, award.code, award.title, award.description, award.earnedAt]
     );
   },
-  
+
   async markEarned(code: string): Promise<void> {
     const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE awards SET earnedAt = ? WHERE code = ? AND earnedAt IS NULL',
-      [Date.now(), code]
+      'UPDATE awards SET earnedAt = ? WHERE code = ? AND userId = ? AND earnedAt IS NULL',
+      [Date.now(), code, userId]
     );
   },
 };

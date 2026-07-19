@@ -12,7 +12,7 @@ import ErrorState from '@/components/ErrorState';
 import { Image } from 'expo-image';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
-import { getNextPriority } from '@/services/taskReminderService';
+import { getNextPriority, getTaskDueDateTime } from '@/services/taskReminderService';
 import {
   applyReminderNotificationId,
   cancelTaskReminder,
@@ -328,18 +328,19 @@ export default function TodosScreen() {
   };
 
   const isTaskOverdue = (task: Task) => {
-    if (!task.dueDate || task.isDone) return false;
-    const now = Date.now();
-    const due = task.dueDate;
-    return due < now;
+    if (task.isDone) return false;
+    const due = getTaskDueDateTime(task);
+    if (!due) return false;
+    return due.getTime() < Date.now();
   };
 
   const isTaskDueSoon = (task: Task) => {
-    if (!task.dueDate || task.isDone) return false;
+    if (task.isDone) return false;
+    const due = getTaskDueDateTime(task);
+    if (!due) return false;
     const now = Date.now();
-    const due = task.dueDate;
     const hourInMs = 60 * 60 * 1000;
-    return due > now && due < now + (24 * hourInMs);
+    return due.getTime() > now && due.getTime() < now + (24 * hourInMs);
   };
 
   const renderTask = ({ item }: { item: Task }) => {

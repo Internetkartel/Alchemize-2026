@@ -12,6 +12,7 @@ import {
   syncPurchases,
   type PaywallPackage,
 } from '@/lib/purchases';
+import type { CustomerInfo } from 'react-native-purchases';
 import { useAuth } from '@/contexts/auth-context';
 
 interface SubscriptionContextValue {
@@ -21,7 +22,7 @@ interface SubscriptionContextValue {
   yearlyPackage: PaywallPackage | null;
   lifetimePackage: PaywallPackage | null;
   allPackages: PaywallPackage[];
-  customerInfo: Record<string, unknown> | null;
+  customerInfo: CustomerInfo | null;
   purchase: (pkg: PaywallPackage) => Promise<boolean>;
   restore: () => Promise<boolean>;
   refresh: () => Promise<void>;
@@ -32,14 +33,15 @@ interface SubscriptionContextValue {
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const { currentUserId } = useAuth();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
   const [isLoading, setIsLoading] = useState(true);
   const [isPro, setIsPro] = useState(false);
   const [monthlyPackage, setMonthlyPackage] = useState<PaywallPackage | null>(null);
   const [yearlyPackage, setYearlyPackage] = useState<PaywallPackage | null>(null);
   const [lifetimePackage, setLifetimePackage] = useState<PaywallPackage | null>(null);
   const [allPackages, setAllPackages] = useState<PaywallPackage[]>([]);
-  const [customerInfo, setCustomerInfo] = useState<Record<string, unknown> | null>(null);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
 
   const loadSubscriptionData = useCallback(async () => {
     if (!isPurchasesSupported()) {
