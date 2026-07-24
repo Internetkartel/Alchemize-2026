@@ -71,14 +71,12 @@ export default function MealPrepScreen() {
   const { data: mealPlans = [] } = useQuery({
     queryKey: ['mealPrepPlans', selectedWeek],
     queryFn: async () => {
-      if (Platform.OS === 'web') return [];
       return mealPrepPlansDb.getByWeek(selectedWeek);
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (plan: MealPrepPlan) => {
-      if (Platform.OS === 'web') return;
       return mealPrepPlansDb.create(plan);
     },
     onSuccess: () => {
@@ -90,7 +88,6 @@ export default function MealPrepScreen() {
 
   const updateMutation = useMutation({
     mutationFn: async (plan: MealPrepPlan) => {
-      if (Platform.OS === 'web') return;
       return mealPrepPlansDb.update(plan);
     },
     onSuccess: () => {
@@ -102,7 +99,6 @@ export default function MealPrepScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      if (Platform.OS === 'web') return;
       return mealPrepPlansDb.delete(id);
     },
     onSuccess: () => {
@@ -113,7 +109,6 @@ export default function MealPrepScreen() {
 
   const toggleCompleteMutation = useMutation({
     mutationFn: async (plan: MealPrepPlan) => {
-      if (Platform.OS === 'web') return;
       return mealPrepPlansDb.update({ ...plan, isCompleted: !plan.isCompleted });
     },
     onSuccess: () => {
@@ -292,10 +287,15 @@ export default function MealPrepScreen() {
 
         <View style={styles.dayHeader}>
           <Text style={styles.dayTitle}>{FULL_DAYS[selectedDay]}</Text>
-          <View style={styles.dayStats}>
+          <LinearGradient
+            colors={['rgba(249, 115, 22, 0.25)', 'rgba(249, 115, 22, 0.1)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.dayStats}
+          >
             <Flame size={16} color="#f97316" />
             <Text style={styles.dayCalories}>{Math.round(dayTotals.calories)} cal</Text>
-          </View>
+          </LinearGradient>
         </View>
 
         {MEAL_SLOTS.map((slot) => {
@@ -326,17 +326,25 @@ export default function MealPrepScreen() {
               
               {meals.length === 0 ? (
                 <TouchableOpacity
-                  style={styles.emptySlot}
+                  style={[styles.emptySlot, { borderColor: `${slot.color}30` }]}
                   onPress={() => openAddModal(slot.type)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.emptySlotText}>+ Add {slot.label.toLowerCase()}</Text>
+                  <View style={[styles.emptySlotIcon, { backgroundColor: `${slot.color}18` }]}>
+                    <Plus size={16} color={slot.color} />
+                  </View>
+                  <Text style={styles.emptySlotText}>Add {slot.label.toLowerCase()}</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.mealsContainer}>
                   {meals.map((meal) => (
                     <TouchableOpacity
                       key={meal.id}
-                      style={[styles.mealCard, meal.isCompleted && styles.mealCardCompleted]}
+                      style={[
+                        styles.mealCard,
+                        { borderLeftWidth: 3, borderLeftColor: slot.color },
+                        meal.isCompleted && styles.mealCardCompleted,
+                      ]}
                       onPress={() => openAddModal(slot.type, meal)}
                       activeOpacity={0.7}
                     >
@@ -404,6 +412,11 @@ export default function MealPrepScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+            <LinearGradient
+              colors={['#171722', '#131320']}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {editingMeal ? 'Edit Meal' : 'Add Meal'}
@@ -611,7 +624,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(249, 115, 22, 0.12)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -663,17 +675,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptySlot: {
+    flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 14,
-    padding: 20,
+    padding: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
     borderStyle: 'dashed',
+  },
+  emptySlotIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptySlotText: {
     fontSize: 14,
-    color: '#555',
+    color: '#888',
     fontWeight: '500' as const,
   },
   mealsContainer: {
@@ -770,11 +791,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#151520',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 20,
     maxHeight: '90%',
+    overflow: 'hidden',
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',

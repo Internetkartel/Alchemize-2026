@@ -395,7 +395,10 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase | null> {
       color TEXT NOT NULL DEFAULT '#6366f1',
       section TEXT NOT NULL DEFAULT 'custom',
       lastCompletedDate TEXT NOT NULL DEFAULT '',
-      createdAt INTEGER NOT NULL
+      createdAt INTEGER NOT NULL,
+      reminderEnabled INTEGER NOT NULL DEFAULT 0,
+      reminderTime TEXT,
+      reminderNotificationId TEXT
     );
     
     CREATE TABLE IF NOT EXISTS habit_completions (
@@ -915,6 +918,19 @@ if (!gratitudeHasReflection) {
       }
     }
 
+    const habitsHaveReminderEnabled = await checkColumn('habits', 'reminderEnabled');
+    if (!habitsHaveReminderEnabled) {
+      console.log('[Database] Adding reminder columns to habits');
+      try {
+        await database.execAsync('ALTER TABLE habits ADD COLUMN reminderEnabled INTEGER NOT NULL DEFAULT 0');
+        await database.execAsync('ALTER TABLE habits ADD COLUMN reminderTime TEXT');
+        await database.execAsync('ALTER TABLE habits ADD COLUMN reminderNotificationId TEXT');
+        console.log('[Database] Successfully added reminder columns to habits');
+      } catch (e) {
+        console.log('[Database] habits reminder columns may already exist:', e);
+      }
+    }
+
     const checklistItemsHaveOrderIndex = await checkColumn('goal_checklist_items', 'orderIndex');
     if (!checklistItemsHaveOrderIndex) {
       console.log('[Database] Adding orderIndex column to goal_checklist_items');
@@ -1200,24 +1216,25 @@ export const habitsDb = {
     return rows.map(row => ({
       ...row,
       customDays: safeJsonParse(row.customDays, []),
+      reminderEnabled: Boolean(row.reminderEnabled),
     }));
   },
-  
+
   async create(habit: Habit): Promise<void> {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO habits (id, userId, name, icon, goal, goalUnit, type, frequencyType, customDays, currentProgress, color, section, lastCompletedDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [habit.id, userId, habit.name, habit.icon, habit.goal, habit.goalUnit || null, habit.type, habit.frequencyType, JSON.stringify(habit.customDays), habit.currentProgress, habit.color, habit.section || 'custom', habit.lastCompletedDate, habit.createdAt]
+      'INSERT INTO habits (id, userId, name, icon, goal, goalUnit, type, frequencyType, customDays, currentProgress, color, section, lastCompletedDate, createdAt, reminderEnabled, reminderTime, reminderNotificationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [habit.id, userId, habit.name, habit.icon, habit.goal, habit.goalUnit || null, habit.type, habit.frequencyType, JSON.stringify(habit.customDays), habit.currentProgress, habit.color, habit.section || 'custom', habit.lastCompletedDate, habit.createdAt, habit.reminderEnabled ? 1 : 0, habit.reminderTime, habit.reminderNotificationId]
     );
   },
-  
+
   async update(habit: Habit): Promise<void> {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE habits SET name = ?, icon = ?, goal = ?, goalUnit = ?, type = ?, frequencyType = ?, customDays = ?, currentProgress = ?, color = ?, section = ?, lastCompletedDate = ? WHERE id = ? AND userId = ?',
-      [habit.name, habit.icon, habit.goal, habit.goalUnit || null, habit.type, habit.frequencyType, JSON.stringify(habit.customDays), habit.currentProgress, habit.color, habit.section || 'custom', habit.lastCompletedDate, habit.id, userId]
+      'UPDATE habits SET name = ?, icon = ?, goal = ?, goalUnit = ?, type = ?, frequencyType = ?, customDays = ?, currentProgress = ?, color = ?, section = ?, lastCompletedDate = ?, reminderEnabled = ?, reminderTime = ?, reminderNotificationId = ? WHERE id = ? AND userId = ?',
+      [habit.name, habit.icon, habit.goal, habit.goalUnit || null, habit.type, habit.frequencyType, JSON.stringify(habit.customDays), habit.currentProgress, habit.color, habit.section || 'custom', habit.lastCompletedDate, habit.reminderEnabled ? 1 : 0, habit.reminderTime, habit.reminderNotificationId, habit.id, userId]
     );
   },
   
@@ -1426,6 +1443,14 @@ export const foodLogsDb = {
     }));
   },
   
+  async getById(id: string): Promise<FoodLog | null> {
+    const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
+    const row = await database.getFirstAsync<any>('SELECT * FROM food_logs WHERE id = ? AND userId = ?', [id, userId]);
+    if (!row) return null;
+    return { ...row, isLocked: Boolean(row.isLocked) };
+  },
+
   async create(log: FoodLog): Promise<void> {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';
@@ -1434,10 +1459,21 @@ export const foodLogsDb = {
       [log.id, userId, log.foodName, log.servingDescription, log.calories, log.proteinGrams, log.carbGrams, log.fatGrams, log.sugarGrams, log.fiberGrams, log.mealType, log.sourceType, log.loggedAt, log.isLocked ? 1 : 0, log.calendarEventId]
     );
   },
-  
+
+  async update(log: FoodLog): Promise<void> {
+    const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync(
+      `UPDATE food_logs SET foodName = ?, servingDescription = ?, calories = ?, proteinGrams = ?, carbGrams = ?, fatGrams = ?,
+       sugarGrams = ?, fiberGrams = ?, mealType = ? WHERE id = ? AND userId = ?`,
+      [log.foodName, log.servingDescription, log.calories, log.proteinGrams, log.carbGrams, log.fatGrams, log.sugarGrams, log.fiberGrams, log.mealType, log.id, userId]
+    );
+  },
+
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
-    await database.runAsync('DELETE FROM food_logs WHERE id = ?', [id]);
+    const userId = getCurrentUserId() ?? 'guest';
+    await database.runAsync('DELETE FROM food_logs WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
 

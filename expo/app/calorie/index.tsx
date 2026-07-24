@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Text, Animated, Dimensions, Platform, ImageBackground } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Animated, Dimensions, Platform, ImageBackground, Alert } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,10 +15,13 @@ import {
   User,
   Zap,
   Calendar,
+  Trash2,
+  Pencil,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { foodLogsDb, userNutritionProfileDb, waterLogsDb } from '@/lib/db/food';
+import { invalidateFoodLogs } from '@/services/queryInvalidationService';
 import type { FoodLog, WaterLog } from '@/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,6 +44,7 @@ export default function CalorieTrackerScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
   
   const calorieAnim = useRef(new Animated.Value(0)).current;
   const proteinAnim = useRef(new Animated.Value(0)).current;
@@ -65,7 +69,6 @@ export default function CalorieTrackerScreen() {
   const { data: profile } = useQuery({
     queryKey: ['nutritionProfile'],
     queryFn: async () => {
-      if (Platform.OS === 'web') return null;
       return userNutritionProfileDb.get();
     },
   });
@@ -73,7 +76,6 @@ export default function CalorieTrackerScreen() {
   const { data: foodLogs = [] } = useQuery({
     queryKey: ['foodLogs', startOfDay, endOfDay],
     queryFn: async () => {
-      if (Platform.OS === 'web') return [];
       return foodLogsDb.getByDate(startOfDay, endOfDay);
     },
   });
@@ -81,14 +83,12 @@ export default function CalorieTrackerScreen() {
   const { data: waterLogs = [] } = useQuery({
     queryKey: ['waterLogs', startOfDay, endOfDay],
     queryFn: async () => {
-      if (Platform.OS === 'web') return [];
       return waterLogsDb.getByDate(startOfDay, endOfDay);
     },
   });
 
   const addWaterMutation = useMutation({
     mutationFn: async (amount: number) => {
-      if (Platform.OS === 'web') return;
       const waterLog: WaterLog = {
         id: Date.now().toString(),
         amount,
@@ -102,6 +102,25 @@ export default function CalorieTrackerScreen() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
   });
+
+  const deleteFoodLogMutation = useMutation({
+    mutationFn: async (id: string) => foodLogsDb.delete(id),
+    onSuccess: () => {
+      invalidateFoodLogs(queryClient);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    },
+    onError: (error: any) => {
+      console.error('[CalorieTracker] Delete food log failed:', error);
+      Alert.alert('Delete failed', error?.message || 'Could not delete this entry. Please try again.');
+    },
+  });
+
+  const handleDeleteFoodLog = useCallback((log: FoodLog) => {
+    Alert.alert('Delete Entry', `Remove "${log.foodName}" from your log?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteFoodLogMutation.mutate(log.id) },
+    ]);
+  }, [deleteFoodLogMutation]);
 
   const goals = useMemo(() => ({
     calories: profile?.dailyCalorieTarget ?? DEFAULT_GOALS.calories,
@@ -407,31 +426,86 @@ export default function CalorieTrackerScreen() {
 
         <View style={styles.mealsSection}>
           <Text style={styles.sectionTitle}>Meals</Text>
-          {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((mealType) => (
-            <TouchableOpacity
-              key={mealType}
-              style={styles.mealRow}
-              onPress={() => router.push(`/calorie/add?meal=${mealType}` as any)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.mealLeft}>
-                <View style={[styles.mealIcon, { backgroundColor: getMealIconBg(mealType) }]}>
-                  <Text style={styles.mealEmoji}>{getMealEmoji(mealType)}</Text>
-                </View>
-                <View style={styles.mealInfo}>
-                  <Text style={styles.mealName}>{capitalizeFirst(mealType)}</Text>
-                  <Text style={styles.mealMeta}>
-                    {getMealCount(mealType)} {getMealCount(mealType) === 1 ? 'item' : 'items'}
-                  </Text>
-                </View>
+          {(['breakfast', 'lunch', 'dinner', 'snack'] as const).map((mealType) => {
+            const isExpanded = expandedMeal === mealType;
+            const items = mealsByType[mealType] ?? [];
+            return (
+              <View key={mealType} style={styles.mealGroup}>
+                <TouchableOpacity
+                  style={styles.mealRow}
+                  onPress={() => {
+                    setExpandedMeal(isExpanded ? null : mealType);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.mealLeft}>
+                    <View style={[styles.mealIcon, { backgroundColor: getMealIconBg(mealType) }]}>
+                      <Text style={styles.mealEmoji}>{getMealEmoji(mealType)}</Text>
+                    </View>
+                    <View style={styles.mealInfo}>
+                      <Text style={styles.mealName}>{capitalizeFirst(mealType)}</Text>
+                      <Text style={styles.mealMeta}>
+                        {getMealCount(mealType)} {getMealCount(mealType) === 1 ? 'item' : 'items'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.mealRight}>
+                    <Text style={styles.mealCals}>{getMealCalories(mealType)}</Text>
+                    <Text style={styles.mealCalsUnit}>cal</Text>
+                    <ChevronRight
+                      size={18}
+                      color="#444"
+                      style={[styles.mealChevron, isExpanded && styles.mealChevronExpanded]}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {isExpanded && (
+                  <View style={styles.mealItemsList}>
+                    {items.length === 0 ? (
+                      <Text style={styles.mealItemsEmpty}>No items logged yet.</Text>
+                    ) : (
+                      items.map((log) => (
+                        <View key={log.id} style={styles.foodLogRow}>
+                          <TouchableOpacity
+                            style={styles.foodLogInfo}
+                            onPress={() => router.push(`/calorie/add?id=${log.id}` as any)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.foodLogName} numberOfLines={1}>{log.foodName}</Text>
+                            <Text style={styles.foodLogMeta}>
+                              {log.servingDescription} · {log.calories} cal
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.foodLogAction}
+                            onPress={() => router.push(`/calorie/add?id=${log.id}` as any)}
+                          >
+                            <Pencil size={15} color="#666" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.foodLogAction}
+                            onPress={() => handleDeleteFoodLog(log)}
+                          >
+                            <Trash2 size={15} color="#ef4444" />
+                          </TouchableOpacity>
+                        </View>
+                      ))
+                    )}
+                    <TouchableOpacity
+                      style={styles.mealAddItemButton}
+                      onPress={() => router.push(`/calorie/add?meal=${mealType}` as any)}
+                      activeOpacity={0.8}
+                    >
+                      <Plus size={14} color="#22c55e" />
+                      <Text style={styles.mealAddItemText}>Add to {capitalizeFirst(mealType)}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-              <View style={styles.mealRight}>
-                <Text style={styles.mealCals}>{getMealCalories(mealType)}</Text>
-                <Text style={styles.mealCalsUnit}>cal</Text>
-                <ChevronRight size={18} color="#444" style={styles.mealChevron} />
-              </View>
-            </TouchableOpacity>
-          ))}
+            );
+          })}
         </View>
 
         <View style={styles.quickActions}>
@@ -793,6 +867,9 @@ const styles = StyleSheet.create({
   mealsSection: {
     marginBottom: 24,
   },
+  mealGroup: {
+    marginBottom: 10,
+  },
   mealRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -800,7 +877,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 16,
     padding: 14,
-    marginBottom: 10,
   },
   mealLeft: {
     flexDirection: 'row',
@@ -845,6 +921,68 @@ const styles = StyleSheet.create({
   },
   mealChevron: {
     marginLeft: 8,
+  },
+  mealChevronExpanded: {
+    transform: [{ rotate: '90deg' }],
+  },
+  mealItemsList: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    marginTop: -6,
+    paddingTop: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  mealItemsEmpty: {
+    fontSize: 13,
+    color: '#555',
+    fontStyle: 'italic' as const,
+    paddingVertical: 8,
+  },
+  foodLogRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  foodLogInfo: {
+    flex: 1,
+  },
+  foodLogName: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#fff',
+  },
+  foodLogMeta: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
+  },
+  foodLogAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  mealAddItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
+  },
+  mealAddItemText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#22c55e',
   },
   quickActions: {
     flexDirection: 'row',

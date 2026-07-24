@@ -1,18 +1,22 @@
 import { invalidateFoodLogs } from '../../services/queryInvalidationService';
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, TextInput, Text, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, TextInput, Text, ScrollView, Alert, Platform, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { 
+import {
   ChevronDown,
   Check,
   Zap,
   Search,
+  Sparkles,
+  Trash2,
 } from 'lucide-react-native';
+import { generateObject } from '@rork-ai/toolkit-sdk';
+import { z } from 'zod';
 import { foodLogsDb } from '@/lib/db/food';
 import { appointmentsDb } from '@/lib/db/appointments';
 import type { FoodLog, MealType, Appointment } from '@/types';
@@ -37,23 +41,80 @@ const QUICK_FOODS = [
   { name: 'Sweet Potato', calories: 103, protein: 2, carbs: 24, fat: 0, emoji: '🍠' },
 ];
 
+const FoodSearchResultSchema = z.object({
+  name: z.string().describe('Clean, specific name of the food, using standard capitalization'),
+  servingDescription: z.string().describe('One standard serving size with weight, e.g. "1 medium (118g)" or "1 cup cooked (185g)"'),
+  calories: z.number().describe('Estimated calories for one standard serving, based on USDA FoodData Central reference values'),
+  protein: z.number().describe('Estimated protein in grams for that serving'),
+  carbs: z.number().describe('Estimated total carbohydrates in grams for that serving'),
+  fat: z.number().describe('Estimated total fat in grams for that serving'),
+  fiber: z.number().describe('Estimated dietary fiber in grams for that serving'),
+});
+
+type FoodSearchResult = z.infer<typeof FoodSearchResultSchema>;
+
+function buildFoodSearchPrompt(query: string): string {
+  return `You are a nutrition database assistant with deep knowledge of the USDA FoodData Central database.
+
+The user wants to log this food: "${query}"
+
+Return your best estimate of nutrition facts for ONE standard serving of this food. If the query names a dish or brand, pick the most common home or restaurant preparation. Use realistic values consistent with USDA reference data (e.g. chicken breast ~165 cal/100g cooked, white rice ~130 cal/100g cooked). If the query is too vague to identify a food at all, still return your best single-item guess rather than refusing.`;
+}
+
 export default function AddMealScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ meal?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; id?: string }>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
+  const isEditMode = !!params.id;
   const initialMealType = (params.meal as MealType) || 'lunch';
-  
+
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
+  const [fiber, setFiber] = useState('');
   const [servingSize, setServingSize] = useState('');
   const [mealType, setMealType] = useState<MealType>(initialMealType);
   const [showMealPicker, setShowMealPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [aiResult, setAiResult] = useState<FoodSearchResult | null>(null);
+
+  const { data: existingLog } = useQuery({
+    queryKey: ['foodLog', params.id],
+    queryFn: () => foodLogsDb.getById(params.id!),
+    enabled: isEditMode,
+  });
+
+  useEffect(() => {
+    if (!existingLog) return;
+    setName(existingLog.foodName);
+    setCalories(existingLog.calories.toString());
+    setProtein(existingLog.proteinGrams != null ? existingLog.proteinGrams.toString() : '');
+    setCarbs(existingLog.carbGrams != null ? existingLog.carbGrams.toString() : '');
+    setFat(existingLog.fatGrams != null ? existingLog.fatGrams.toString() : '');
+    setFiber(existingLog.fiberGrams != null ? existingLog.fiberGrams.toString() : '');
+    setServingSize(existingLog.servingDescription);
+    setMealType(existingLog.mealType);
+  }, [existingLog]);
+
+  const aiSearchMutation = useMutation({
+    mutationFn: async (query: string) => {
+      return generateObject({
+        messages: [{ role: 'user', content: buildFoodSearchPrompt(query) }],
+        schema: FoodSearchResultSchema,
+      });
+    },
+    onSuccess: (result) => {
+      setAiResult(result);
+    },
+    onError: (error: any) => {
+      console.error('[AddFood] AI food search failed:', error);
+      Alert.alert('Search failed', 'Could not look up that food. Please try again or enter it manually.');
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: async (foodLog: FoodLog) => {
@@ -106,7 +167,35 @@ export default function AddMealScreen() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (foodLog: FoodLog) => foodLogsDb.update(foodLog),
+    onSuccess: () => {
+      invalidateFoodLogs(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['foodLog', params.id] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    },
+    onError: (error: any) => {
+      console.error('[AddFood] Update failed:', error);
+      Alert.alert('Save failed', error?.message || 'Could not update food. Please try again.');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => foodLogsDb.delete(id),
+    onSuccess: () => {
+      invalidateFoodLogs(queryClient);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    },
+    onError: (error: any) => {
+      console.error('[AddFood] Delete failed:', error);
+      Alert.alert('Delete failed', error?.message || 'Could not delete this entry. Please try again.');
+    },
+  });
+
   const { mutate: createFood } = createMutation;
+  const { mutate: updateFood } = updateMutation;
 
   const handleSave = useCallback(() => {
     if (!name.trim()) {
@@ -115,6 +204,22 @@ export default function AddMealScreen() {
     }
     if (!calories.trim() || isNaN(parseFloat(calories))) {
       Alert.alert('Error', 'Please enter valid calories');
+      return;
+    }
+
+    if (isEditMode && existingLog) {
+      const updated: FoodLog = {
+        ...existingLog,
+        foodName: name.trim(),
+        servingDescription: servingSize.trim() || '1 serving',
+        calories: parseFloat(calories),
+        proteinGrams: protein ? parseFloat(protein) : null,
+        carbGrams: carbs ? parseFloat(carbs) : null,
+        fatGrams: fat ? parseFloat(fat) : null,
+        fiberGrams: fiber ? parseFloat(fiber) : null,
+        mealType,
+      };
+      updateFood(updated);
       return;
     }
 
@@ -127,7 +232,7 @@ export default function AddMealScreen() {
       carbGrams: carbs ? parseFloat(carbs) : null,
       fatGrams: fat ? parseFloat(fat) : null,
       sugarGrams: null,
-      fiberGrams: null,
+      fiberGrams: fiber ? parseFloat(fiber) : null,
       mealType,
       sourceType: 'manual',
       loggedAt: Date.now(),
@@ -136,7 +241,19 @@ export default function AddMealScreen() {
     };
 
     createFood(foodLog);
-  }, [name, calories, protein, carbs, fat, servingSize, mealType, createFood]);
+  }, [name, calories, protein, carbs, fat, fiber, servingSize, mealType, createFood, updateFood, isEditMode, existingLog]);
+
+  const handleDelete = useCallback(() => {
+    if (!params.id) return;
+    Alert.alert('Delete Entry', 'Remove this food log entry? This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => deleteMutation.mutate(params.id!),
+      },
+    ]);
+  }, [params.id, deleteMutation]);
 
   const handleQuickFood = useCallback((food: typeof QUICK_FOODS[0]) => {
     setName(food.name);
@@ -145,8 +262,29 @@ export default function AddMealScreen() {
     setCarbs(food.carbs.toString());
     setFat(food.fat.toString());
     setServingSize('1 serving');
+    setAiResult(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
+
+  const handleUseAiResult = useCallback(() => {
+    if (!aiResult) return;
+    setName(aiResult.name);
+    setCalories(Math.round(aiResult.calories).toString());
+    setProtein(Math.round(aiResult.protein).toString());
+    setCarbs(Math.round(aiResult.carbs).toString());
+    setFat(Math.round(aiResult.fat).toString());
+    setFiber(Math.round(aiResult.fiber).toString());
+    setServingSize(aiResult.servingDescription);
+    setAiResult(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [aiResult]);
+
+  const handleAiSearch = useCallback(() => {
+    const query = searchQuery.trim();
+    if (!query || aiSearchMutation.isPending) return;
+    setAiResult(null);
+    aiSearchMutation.mutate(query);
+  }, [searchQuery, aiSearchMutation]);
 
   const filteredFoods = QUICK_FOODS.filter(food =>
     food.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -160,13 +298,14 @@ export default function AddMealScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      <Stack.Screen options={{ title: isEditMode ? 'Edit Food' : 'Log Food' }} />
       <LinearGradient
         colors={['#0a0a0f', '#0d0d15', '#0a0a0f']}
         style={StyleSheet.absoluteFill}
       />
-      
-      <ScrollView 
-        style={styles.scrollView} 
+
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -183,7 +322,7 @@ export default function AddMealScreen() {
             <Text style={styles.mealTypeText}>{selectedMeal?.label}</Text>
             <ChevronDown size={18} color="#666" />
           </TouchableOpacity>
-          
+
           {showMealPicker && (
             <View style={styles.mealPickerDropdown}>
               {MEAL_TYPES.map((meal) => (
@@ -209,40 +348,83 @@ export default function AddMealScreen() {
         </View>
 
         <View style={styles.quickSection}>
-          <Text style={styles.sectionLabel}>Quick Add</Text>
+          <Text style={styles.sectionLabel}>Search Foods</Text>
           <View style={styles.searchContainer}>
             <Search size={18} color="#666" />
             <TextInput
               style={styles.searchInput}
               value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search foods..."
+              onChangeText={(text) => {
+                setSearchQuery(text);
+                setAiResult(null);
+              }}
+              placeholder="Search foods or ask AI..."
               placeholderTextColor="#555"
+              onSubmitEditing={handleAiSearch}
+              returnKeyType="search"
             />
           </View>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickFoodsContainer}
-          >
-            {filteredFoods.map((food, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.quickFoodCard}
-                onPress={() => handleQuickFood(food)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.quickFoodEmoji}>{food.emoji}</Text>
-                <Text style={styles.quickFoodName}>{food.name}</Text>
-                <Text style={styles.quickFoodCal}>{food.calories} cal</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+
+          {filteredFoods.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickFoodsContainer}
+            >
+              {filteredFoods.map((food, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.quickFoodCard}
+                  onPress={() => handleQuickFood(food)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.quickFoodEmoji}>{food.emoji}</Text>
+                  <Text style={styles.quickFoodName}>{food.name}</Text>
+                  <Text style={styles.quickFoodCal}>{food.calories} cal</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {searchQuery.trim().length > 0 && (
+            <TouchableOpacity
+              style={styles.aiSearchButton}
+              onPress={handleAiSearch}
+              disabled={aiSearchMutation.isPending}
+              activeOpacity={0.85}
+            >
+              {aiSearchMutation.isPending ? (
+                <ActivityIndicator color="#a78bfa" size="small" />
+              ) : (
+                <Sparkles size={16} color="#a78bfa" />
+              )}
+              <Text style={styles.aiSearchButtonText}>
+                {aiSearchMutation.isPending ? 'Asking AI…' : `Search "${searchQuery.trim()}" with AI`}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {aiResult && (
+            <TouchableOpacity style={styles.aiResultCard} onPress={handleUseAiResult} activeOpacity={0.85}>
+              <View style={styles.aiResultHeader}>
+                <Sparkles size={16} color="#a78bfa" />
+                <Text style={styles.aiResultTitle}>{aiResult.name}</Text>
+              </View>
+              <Text style={styles.aiResultServing}>{aiResult.servingDescription}</Text>
+              <View style={styles.aiResultMacros}>
+                <Text style={styles.aiResultMacro}>{Math.round(aiResult.calories)} cal</Text>
+                <Text style={styles.aiResultMacro}>P {Math.round(aiResult.protein)}g</Text>
+                <Text style={styles.aiResultMacro}>C {Math.round(aiResult.carbs)}g</Text>
+                <Text style={styles.aiResultMacro}>F {Math.round(aiResult.fat)}g</Text>
+              </View>
+              <Text style={styles.aiResultHint}>Tap to fill in the form below</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.inputSection}>
           <Text style={styles.sectionLabel}>Food Details</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Food Name</Text>
             <TextInput
@@ -281,7 +463,7 @@ export default function AddMealScreen() {
 
         <View style={styles.macrosSection}>
           <Text style={styles.sectionLabel}>Macros (optional)</Text>
-          
+
           <View style={styles.macrosGrid}>
             <View style={styles.macroCard}>
               <View style={[styles.macroDot, { backgroundColor: '#ef4444' }]} />
@@ -356,17 +538,28 @@ export default function AddMealScreen() {
             </View>
           </View>
         )}
+
+        {isEditMode && (
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} disabled={deleteMutation.isPending}>
+            <Trash2 size={18} color="#ef4444" />
+            <Text style={styles.deleteButtonText}>
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete Entry'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <View style={[styles.bottomActions, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
           style={styles.saveButton}
           onPress={handleSave}
-          disabled={createMutation.isPending}
+          disabled={createMutation.isPending || updateMutation.isPending}
           activeOpacity={0.85}
         >
           <Text style={styles.saveButtonText}>
-            {createMutation.isPending ? 'Saving...' : 'Log Food'}
+            {createMutation.isPending || updateMutation.isPending
+              ? 'Saving...'
+              : isEditMode ? 'Update Food' : 'Log Food'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -494,6 +687,63 @@ const styles = StyleSheet.create({
     color: '#22c55e',
     fontWeight: '500' as const,
   },
+  aiSearchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(167, 139, 250, 0.12)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.25)',
+  },
+  aiSearchButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#a78bfa',
+  },
+  aiResultCard: {
+    marginTop: 12,
+    backgroundColor: 'rgba(167, 139, 250, 0.08)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.25)',
+  },
+  aiResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  aiResultTitle: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#fff',
+    flexShrink: 1,
+  },
+  aiResultServing: {
+    fontSize: 13,
+    color: '#999',
+    marginBottom: 10,
+  },
+  aiResultMacros: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 8,
+  },
+  aiResultMacro: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#a78bfa',
+  },
+  aiResultHint: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic' as const,
+  },
   inputSection: {
     marginBottom: 24,
   },
@@ -595,6 +845,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
     marginTop: 4,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  deleteButtonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#ef4444',
   },
   bottomActions: {
     position: 'absolute',

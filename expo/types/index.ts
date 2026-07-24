@@ -61,6 +61,9 @@ export interface Habit {
   section?: string;
   lastCompletedDate: string;
   createdAt: number;
+  reminderEnabled: boolean;
+  reminderTime: string | null;
+  reminderNotificationId: string | null;
 }
 
 export interface HabitCompletion {

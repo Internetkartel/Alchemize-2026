@@ -5,8 +5,10 @@ import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { X, Timer, CheckSquare, Hash } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { X, Timer, CheckSquare, Hash, Bell } from 'lucide-react-native';
 import { habitsDb } from '@/lib/db';
+import { scheduleHabitReminder, getNotificationStatus, registerForPushNotifications } from '@/lib/notifications';
 import type { Habit, HabitType } from '@/types';
 import { ASSETS } from '@/constants/assets';
 
@@ -39,6 +41,13 @@ export default function AddHabitScreen() {
   const [icon, setIcon] = useState('✨');
   const [goal, setGoal] = useState('1');
   const [goalUnit, setGoalUnit] = useState<'minutes' | 'hours' | 'times'>('times');
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState(() => {
+    const d = new Date();
+    d.setHours(8, 0, 0, 0);
+    return d;
+  });
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: (habit: Habit) => habitsDb.create(habit),
@@ -60,16 +69,39 @@ export default function AddHabitScreen() {
     setGoalUnit(template.goalUnit);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter a habit name');
       return;
     }
 
     const goalNum = parseInt(goal) || 1;
+    const habitId = Date.now().toString();
+
+    let reminderNotificationId: string | null = null;
+    if (reminderEnabled) {
+      let hasPermission = await getNotificationStatus();
+      if (!hasPermission) {
+        const token = await registerForPushNotifications();
+        hasPermission = token !== null || (await getNotificationStatus());
+      }
+      if (hasPermission) {
+        reminderNotificationId = await scheduleHabitReminder(
+          habitId,
+          name.trim(),
+          reminderTime.getHours(),
+          reminderTime.getMinutes()
+        );
+      } else if (Platform.OS !== 'web') {
+        Alert.alert(
+          'Notifications Disabled',
+          'Enable notifications in Settings to get habit reminders. Saving without a reminder for now.'
+        );
+      }
+    }
 
     const habit: Habit = {
-      id: Date.now().toString(),
+      id: habitId,
       name: name.trim(),
       icon,
       goal: goalNum,
@@ -82,9 +114,17 @@ export default function AddHabitScreen() {
       section,
       lastCompletedDate: '',
       createdAt: Date.now(),
+      reminderEnabled: reminderEnabled && reminderNotificationId !== null,
+      reminderTime: reminderEnabled ? `${reminderTime.getHours().toString().padStart(2, '0')}:${reminderTime.getMinutes().toString().padStart(2, '0')}` : null,
+      reminderNotificationId,
     };
 
     createMutation.mutate(habit);
+  };
+
+  const handleReminderTimeChange = (event: any, date?: Date) => {
+    setShowReminderPicker(Platform.OS === 'ios');
+    if (date) setReminderTime(date);
   };
 
   return (
@@ -232,6 +272,47 @@ export default function AddHabitScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={styles.label}>Reminder</Text>
+            <TouchableOpacity
+              style={styles.reminderToggleRow}
+              onPress={() => setReminderEnabled((v) => !v)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.reminderToggleLeft}>
+                <Bell color={reminderEnabled ? '#FFD700' : 'rgba(201, 167, 255, 0.6)'} size={20} />
+                <Text style={styles.reminderToggleText}>Daily reminder notification</Text>
+              </View>
+              <View style={[styles.switchTrack, reminderEnabled && styles.switchTrackActive]}>
+                <View style={[styles.switchThumb, reminderEnabled && styles.switchThumbActive]} />
+              </View>
+            </TouchableOpacity>
+
+            {reminderEnabled && (
+              <>
+                <TouchableOpacity
+                  style={styles.reminderTimeButton}
+                  onPress={() => setShowReminderPicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.reminderTimeText}>
+                    {reminderTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                </TouchableOpacity>
+                {Platform.OS === 'web' && (
+                  <Text style={styles.reminderWebNote}>Reminders require the mobile app — not available on web.</Text>
+                )}
+                {showReminderPicker && (
+                  <DateTimePicker
+                    value={reminderTime}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleReminderTimeChange}
+                    themeVariant="dark"
+                  />
+                )}
+              </>
+            )}
           </BlurView>
 
           <TouchableOpacity
@@ -361,6 +442,65 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#FFFFFF',
+  },
+  reminderToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(201, 167, 255, 0.3)',
+  },
+  reminderToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reminderToggleText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#C9A7FF',
+  },
+  switchTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(201, 167, 255, 0.2)',
+    padding: 2,
+  },
+  switchTrackActive: {
+    backgroundColor: '#6366f1',
+  },
+  switchThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+  },
+  switchThumbActive: {
+    transform: [{ translateX: 18 }],
+  },
+  reminderTimeButton: {
+    marginTop: 10,
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 167, 255, 0.3)',
+  },
+  reminderTimeText: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#FFD700',
+  },
+  reminderWebNote: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'rgba(201, 167, 255, 0.5)',
+    fontStyle: 'italic' as const,
   },
   templatesSection: {
     marginBottom: 20,

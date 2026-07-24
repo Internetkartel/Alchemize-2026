@@ -18,7 +18,9 @@ import {
   Edit3,
   Save,
   Trash2,
+  CalendarDays,
 } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { financialIncomeDb, financialExpenseDb, financialNoteDb } from '@/lib/db/finance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { FinancialIncome, FinancialExpense, FinancialNote } from '@/types';
@@ -191,6 +193,8 @@ export default function FinancialTrackerScreen() {
   const [formAmount, setFormAmount] = useState('');
   const [formCategory, setFormCategory] = useState('salary');
   const [formNote, setFormNote] = useState('');
+  const [formDate, setFormDate] = useState(new Date());
+  const [showFormDatePicker, setShowFormDatePicker] = useState(false);
 
   const { data: incomeData = [] } = useQuery({
     queryKey: ['financial-income'],
@@ -313,7 +317,17 @@ export default function FinancialTrackerScreen() {
     setFormAmount('');
     setFormCategory(type === 'income' ? 'salary' : 'bills');
     setFormNote('');
+    const selectedDay = type === 'income' ? selectedIncomeDay : selectedExpenseDay;
+    const calYear = type === 'income' ? incomeCalYear : expenseCalYear;
+    const calMonth = type === 'income' ? incomeCalMonth : expenseCalMonth;
+    setFormDate(selectedDay != null ? new Date(calYear, calMonth, selectedDay) : new Date());
+    setShowFormDatePicker(false);
     setAddModalVisible(true);
+  }, [selectedIncomeDay, selectedExpenseDay, incomeCalYear, incomeCalMonth, expenseCalYear, expenseCalMonth]);
+
+  const handleFormDateChange = useCallback((event: any, date?: Date) => {
+    setShowFormDatePicker(Platform.OS === 'ios');
+    if (date) setFormDate(date);
   }, []);
 
   const addIncomeMutation = useMutation({
@@ -357,6 +371,7 @@ export default function FinancialTrackerScreen() {
       return;
     }
     const now = Date.now();
+    const entryDate = formDate.getTime();
     if (addModalType === 'income') {
       const income: FinancialIncome = {
         id: `inc_${now}_${Math.random().toString(36).slice(2, 8)}`,
@@ -366,7 +381,7 @@ export default function FinancialTrackerScreen() {
         taxPercentage: 0,
         deductions: 0,
         incomeCategory: formCategory as FinancialIncome['incomeCategory'],
-        incomeDate: now,
+        incomeDate: entryDate,
         notes: formNote.trim(),
         createdAt: now,
       };
@@ -377,13 +392,13 @@ export default function FinancialTrackerScreen() {
         expenseName: formTitle.trim(),
         expenseAmount: amount,
         expenseCategory: formCategory as FinancialExpense['expenseCategory'],
-        expenseDate: now,
+        expenseDate: entryDate,
         notes: formNote.trim(),
         createdAt: now,
       };
       addExpenseMutation.mutate(expense);
     }
-  }, [formTitle, formAmount, formCategory, formNote, addModalType, addIncomeMutation, addExpenseMutation]);
+  }, [formTitle, formAmount, formCategory, formNote, formDate, addModalType, addIncomeMutation, addExpenseMutation]);
 
   const saveNotesMutation = useMutation({
     mutationFn: async (note: FinancialNote) => {
@@ -792,6 +807,29 @@ export default function FinancialTrackerScreen() {
                   placeholderTextColor="rgba(255,255,255,0.35)"
                   keyboardType="decimal-pad"
                 />
+
+                <Text style={styles.modalLabel}>Date</Text>
+                <TouchableOpacity
+                  style={styles.dateInputButton}
+                  onPress={() => setShowFormDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <CalendarDays size={18} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.dateInputText}>
+                    {formDate.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </Text>
+                </TouchableOpacity>
+                {showFormDatePicker && (
+                  <DateTimePicker
+                    value={formDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleFormDateChange}
+                    themeVariant="dark"
+                    maximumDate={new Date(2100, 0, 1)}
+                    minimumDate={new Date(2000, 0, 1)}
+                  />
+                )}
 
                 <Text style={styles.modalLabel}>Category</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
@@ -1401,6 +1439,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dateInputButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dateInputText: {
+    fontSize: 15,
+    color: '#fff',
   },
   categoryScroll: {
     marginBottom: 4,

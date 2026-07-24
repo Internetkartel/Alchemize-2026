@@ -24,6 +24,16 @@ const SECTIONS: { key: Section; label: string }[] = [
 
 const WEEK_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+function formatReminderTime(time: string): string {
+  const [hourStr, minuteStr] = time.split(':');
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return time;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${minute.toString().padStart(2, '0')} ${period}`;
+}
+
 export default function HabitsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -261,6 +271,7 @@ export default function HabitsScreen() {
                 {habit.type === 'timer' && `⏱ ${habit.goal} ${habit.goalUnit}`}
                 {habit.type === 'counter' && `🔢 ${habit.goal} times`}
                 {habit.type === 'checkbox' && 'Daily task'}
+                {habit.reminderEnabled && habit.reminderTime && ` · 🔔 ${formatReminderTime(habit.reminderTime)}`}
               </Text>
             </View>
           </View>
