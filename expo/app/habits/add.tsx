@@ -22,6 +22,20 @@ const HABIT_TYPES: { type: HabitType; label: string; icon: any }[] = [
   { type: 'counter', label: 'Counter', icon: Hash },
 ];
 
+function buildReminderTimeOptions(): { hour: number; minute: number; label: string }[] {
+  const options: { hour: number; minute: number; label: string }[] = [];
+  for (let hour = 5; hour <= 22; hour++) {
+    for (const minute of [0, 30]) {
+      const period = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+      options.push({ hour, minute, label: `${displayHour}:${minute.toString().padStart(2, '0')} ${period}` });
+    }
+  }
+  return options;
+}
+
+const REMINDER_TIME_OPTIONS = buildReminderTimeOptions();
+
 const TEMPLATES = [
   { emoji: '🧘', name: 'Meditate', type: 'timer' as HabitType, goal: 15, goalUnit: 'minutes' as const },
   { emoji: '💪', name: 'Exercise', type: 'timer' as HabitType, goal: 30, goalUnit: 'minutes' as const },
@@ -209,6 +223,75 @@ export default function AddHabitScreen() {
               })}
             </View>
 
+            <Text style={styles.label}>Reminder</Text>
+            <TouchableOpacity
+              style={styles.reminderToggleRow}
+              onPress={() => setReminderEnabled((v) => !v)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.reminderToggleLeft}>
+                <Bell color={reminderEnabled ? '#FFD700' : 'rgba(201, 167, 255, 0.6)'} size={20} />
+                <Text style={styles.reminderToggleText}>Daily reminder notification</Text>
+              </View>
+              <View style={[styles.switchTrack, reminderEnabled && styles.switchTrackActive]}>
+                <View style={[styles.switchThumb, reminderEnabled && styles.switchThumbActive]} />
+              </View>
+            </TouchableOpacity>
+
+            {reminderEnabled && (
+              <>
+                {Platform.OS === 'web' ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.reminderTimeScroll}
+                    contentContainerStyle={styles.reminderTimeScrollContent}
+                  >
+                    {REMINDER_TIME_OPTIONS.map((time) => {
+                      const isSelected =
+                        reminderTime.getHours() === time.hour && reminderTime.getMinutes() === time.minute;
+                      return (
+                        <TouchableOpacity
+                          key={`${time.hour}:${time.minute}`}
+                          style={[styles.timeChip, isSelected && styles.timeChipActive]}
+                          onPress={() => {
+                            const d = new Date(reminderTime);
+                            d.setHours(time.hour, time.minute, 0, 0);
+                            setReminderTime(d);
+                          }}
+                        >
+                          <Text style={[styles.timeChipText, isSelected && styles.timeChipTextActive]}>
+                            {time.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.reminderTimeButton}
+                      onPress={() => setShowReminderPicker(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.reminderTimeText}>
+                        {reminderTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      </Text>
+                    </TouchableOpacity>
+                    {showReminderPicker && (
+                      <DateTimePicker
+                        value={reminderTime}
+                        mode="time"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={handleReminderTimeChange}
+                        themeVariant="dark"
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
             {habitType !== 'checkbox' && (
               <>
                 <Text style={styles.label}>Goal</Text>
@@ -272,47 +355,6 @@ export default function AddHabitScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-
-            <Text style={styles.label}>Reminder</Text>
-            <TouchableOpacity
-              style={styles.reminderToggleRow}
-              onPress={() => setReminderEnabled((v) => !v)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.reminderToggleLeft}>
-                <Bell color={reminderEnabled ? '#FFD700' : 'rgba(201, 167, 255, 0.6)'} size={20} />
-                <Text style={styles.reminderToggleText}>Daily reminder notification</Text>
-              </View>
-              <View style={[styles.switchTrack, reminderEnabled && styles.switchTrackActive]}>
-                <View style={[styles.switchThumb, reminderEnabled && styles.switchThumbActive]} />
-              </View>
-            </TouchableOpacity>
-
-            {reminderEnabled && (
-              <>
-                <TouchableOpacity
-                  style={styles.reminderTimeButton}
-                  onPress={() => setShowReminderPicker(true)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.reminderTimeText}>
-                    {reminderTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                  </Text>
-                </TouchableOpacity>
-                {Platform.OS === 'web' && (
-                  <Text style={styles.reminderWebNote}>Reminders require the mobile app — not available on web.</Text>
-                )}
-                {showReminderPicker && (
-                  <DateTimePicker
-                    value={reminderTime}
-                    mode="time"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={handleReminderTimeChange}
-                    themeVariant="dark"
-                  />
-                )}
-              </>
-            )}
           </BlurView>
 
           <TouchableOpacity
@@ -496,11 +538,33 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: '#FFD700',
   },
-  reminderWebNote: {
-    marginTop: 8,
-    fontSize: 12,
-    color: 'rgba(201, 167, 255, 0.5)',
-    fontStyle: 'italic' as const,
+  reminderTimeScroll: {
+    marginTop: 10,
+    flexGrow: 0,
+  },
+  reminderTimeScrollContent: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 167, 255, 0.3)',
+  },
+  timeChipActive: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  timeChipText: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: 'rgba(201, 167, 255, 0.7)',
+  },
+  timeChipTextActive: {
+    color: '#FFFFFF',
   },
   templatesSection: {
     marginBottom: 20,
