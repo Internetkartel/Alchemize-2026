@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Platform, ScrollView, StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Animated, Easing, ScrollView, StyleProp, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { Stack, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';

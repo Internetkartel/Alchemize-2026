@@ -686,7 +686,7 @@ function OrbitalHomeScreen({ featureCards, onCardPress, router }: OrbitalHomeScr
     while (floatAnims.length > featureCards.length) {
       floatAnims.pop();
     }
-  }, [featureCards.length]);
+  }, [featureCards.length, floatAnims]);
   const sparkleAnims = useRef(
     Array.from({ length: 12 }, () => ({
       opacity: new Animated.Value(0),

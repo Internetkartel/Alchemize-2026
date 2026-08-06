@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, memo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, Modal, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Modal, Pressable, Alert } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

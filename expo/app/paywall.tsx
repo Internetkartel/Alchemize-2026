@@ -3,7 +3,7 @@ import { View, StyleSheet, Text, ScrollView, Alert, ActivityIndicator, Linking }
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Check, Crown } from 'lucide-react-native';
+import { Check, Crown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { useSubscription } from '@/contexts/subscription-context';
@@ -27,7 +27,6 @@ export default function PaywallScreen() {
     monthlyPackage,
     yearlyPackage,
     lifetimePackage,
-    allPackages,
     purchase,
     restore,
   } = useSubscription();

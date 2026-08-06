@@ -11,7 +11,7 @@ import { Mail, Lock, User, Eye, EyeOff, Globe, ChevronRight, ShieldAlert, Check 
 
 const TERMS_ACCEPTED_KEY = '@alchemize/terms_accepted_v1';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CRYSTAL_BALL_IMAGE = 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/89z8qu274hk8f1cht7vcg.png';
 
 const TRANSLATIONS = {
@@ -175,30 +175,32 @@ export default function AuthScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.prompt
-      ? Alert.prompt(
-          t.resetTitle,
-          t.resetMessage,
-          async (resetEmail: string) => {
-            if (!resetEmail) {
-              Alert.alert('Error', t.enterEmail);
-              return;
-            }
-            const result = await resetPassword(resetEmail);
-            if (result.success) {
-              Alert.alert(t.resetTitle, t.resetSent);
-            } else {
-              Alert.alert('Error', result.error || 'Failed to send reset link');
-            }
-          },
-          'plain-text',
-          email,
-          'email-address'
-        )
-      : Alert.alert(
-          t.resetTitle,
-          t.resetMessage + '\n\n' + t.resetSent
-        );
+    if (Alert.prompt) {
+      Alert.prompt(
+        t.resetTitle,
+        t.resetMessage,
+        async (resetEmail: string) => {
+          if (!resetEmail) {
+            Alert.alert('Error', t.enterEmail);
+            return;
+          }
+          const result = await resetPassword(resetEmail);
+          if (result.success) {
+            Alert.alert(t.resetTitle, t.resetSent);
+          } else {
+            Alert.alert('Error', result.error || 'Failed to send reset link');
+          }
+        },
+        'plain-text',
+        email,
+        'email-address'
+      );
+    } else {
+      Alert.alert(
+        t.resetTitle,
+        t.resetMessage + '\n\n' + t.resetSent
+      );
+    }
   };
 
   const showAppleNative = appleAuthAvailable && Platform.OS !== 'web';

@@ -3,7 +3,7 @@ import { View, StyleSheet, TextInput, Text, ScrollView, Alert, ActivityIndicator
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Sparkles, Zap, X, ChevronLeft } from 'lucide-react-native';
+import { Sparkles, Zap, ChevronLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { generateObject } from '@rork-ai/toolkit-sdk';
 import { z } from 'zod';
@@ -51,8 +51,6 @@ export default function AddWorkoutScreen() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (Platform.OS === 'web') return;
-
       const durationNum = parseInt(duration, 10);
       if (isNaN(durationNum) || durationNum <= 0) {
         throw new Error('Invalid duration');

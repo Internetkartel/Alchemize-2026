@@ -50,6 +50,13 @@ export default function TodosScreen() {
     queryFn: () => tasksDb.getAll(),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (task: Task) => tasksDb.update(task),
+    onSuccess: () => {
+      void invalidateTasks(queryClient);
+    },
+  });
+
   const reconciledOnce = useRef<boolean>(false);
 
   useEffect(() => {
@@ -73,7 +80,11 @@ export default function TodosScreen() {
         console.error('[Todos] Reconcile reminders error:', e);
       }
     })();
-  }, [allTasks]);
+    // updateMutation.mutate is stable across renders (TanStack Query v5 memoizes it
+    // internally); the parent updateMutation object is not, so depending on the whole
+    // object would re-run this effect on every render for no benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTasks, updateMutation.mutate]);
 
   const filteredTasks = allTasks.filter((t) => {
     if (filterMode === 'active') return !t.isDone;
@@ -94,13 +105,6 @@ export default function TodosScreen() {
     onSuccess: () => {
       void invalidateTasks(queryClient);
       setNewTaskTitle('');
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (task: Task) => tasksDb.update(task),
-    onSuccess: () => {
-      void invalidateTasks(queryClient);
     },
   });
 

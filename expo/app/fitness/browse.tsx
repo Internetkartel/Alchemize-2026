@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Text, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, Text } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -24,7 +24,6 @@ export default function BrowseWorkoutsScreen() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['workoutTemplates'],
     queryFn: async () => {
-      if (Platform.OS === 'web') return [];
       const data = await workoutTemplatesDb.getAll();
       if (data.length === 0) {
         await seedWorkoutTemplates();

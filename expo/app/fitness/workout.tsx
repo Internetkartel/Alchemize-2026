@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Text, ScrollView, Alert } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -68,7 +68,6 @@ export default function WorkoutScreen() {
 
   const completeMutation = useMutation({
     mutationFn: async () => {
-      if (Platform.OS === 'web') return;
       if (!template) throw new Error('No template');
 
       const durationMinutes = Math.max(1, Math.round(elapsedSeconds / 60));

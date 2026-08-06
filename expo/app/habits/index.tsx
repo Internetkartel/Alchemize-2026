@@ -4,7 +4,6 @@ import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Settings, ChevronDown, ChevronUp, Timer, Hash, CheckSquare, Play, Pause, Square } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { habitsDb, habitCompletionsDb } from '@/lib/db';
@@ -239,10 +238,13 @@ export default function HabitsScreen() {
   };
 
   useEffect(() => {
+    // Intentionally reads ref.current at cleanup time (not a snapshot) — habit timers
+    // can be started well after mount, and we need to clear whatever's running at unmount.
     return () => {
       timerIntervalsRef.current.forEach((interval: any) => {
         clearInterval(interval);
       });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       timerIntervalsRef.current.clear();
     };
   }, []);

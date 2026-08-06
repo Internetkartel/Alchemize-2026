@@ -1,5 +1,5 @@
 import { invalidateFoodLogs } from '../../services/queryInvalidationService';
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Text, Platform, ActivityIndicator, ScrollView, TextInput, Alert, Animated, Dimensions, KeyboardAvoidingView } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
@@ -18,7 +18,6 @@ import {
   Check,
   RotateCcw,
   ChevronDown,
-  Zap,
   AlertCircle,
   RefreshCw,
   Info,
@@ -268,8 +267,6 @@ export default function FoodScannerScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async (foods: FoodAnalysis['foods']) => {
-      if (Platform.OS === 'web') return;
-
       const logs: FoodLog[] = foods.map((food) => ({
         id: `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         foodName: food.name,
@@ -413,7 +410,6 @@ export default function FoodScannerScreen() {
 
   const barcodeSaveMutation = useMutation({
     mutationFn: async () => {
-      if (Platform.OS === 'web') return;
       if (!barcodeData || !barcodeFoodName.trim() || !barcodeCalories.trim()) return;
 
       const calories = parseFloat(barcodeCalories);
