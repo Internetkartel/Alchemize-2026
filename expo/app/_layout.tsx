@@ -29,8 +29,7 @@ const queryClient = new QueryClient({
 
 function BackButton() {
   const router = useRouter();
-  const navState = useRootNavigationState();
-  const canGoBack = (navState?.routes?.length ?? 0) > 1;
+  const canGoBack = router.canGoBack();
   if (!canGoBack) return null;
   return (
     <TouchableOpacity
