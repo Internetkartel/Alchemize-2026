@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView, Text, ImageBackground, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, ImageBackground } from 'react-native';
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -36,7 +36,6 @@ export default function FitnessHubScreen() {
   const { data: templates = [] } = useQuery({
     queryKey: ['workoutTemplates'],
     queryFn: async () => {
-      if (Platform.OS === 'web') return [];
       const data = await workoutTemplatesDb.getAll();
       if (data.length === 0) {
         await seedWorkoutTemplates();
@@ -48,13 +47,12 @@ export default function FitnessHubScreen() {
 
   const { data: sessions = [] } = useQuery({
     queryKey: ['workoutSessions'],
-    queryFn: () => Platform.OS === 'web' ? [] : workoutSessionsDb.getAll(),
+    queryFn: () => workoutSessionsDb.getAll(),
   });
 
   const { data: todayMetric } = useQuery({
     queryKey: ['todayMetric'],
     queryFn: async () => {
-      if (Platform.OS === 'web') return null;
       const today = new Date();
       const dateStr = today.toISOString().split('T')[0];
       return await normalizedMetricsDb.getByDate(dateStr);
@@ -63,18 +61,17 @@ export default function FitnessHubScreen() {
 
   const { data: goals = [] } = useQuery({
     queryKey: ['fitnessGoals'],
-    queryFn: () => Platform.OS === 'web' ? [] : fitnessGoalsDb.getAll(),
+    queryFn: () => fitnessGoalsDb.getAll(),
   });
 
   const { data: activePlan } = useQuery({
     queryKey: ['activeFitnessPlan'],
-    queryFn: () => Platform.OS === 'web' ? null : fitnessPlansDb.getActive(),
+    queryFn: () => fitnessPlansDb.getActive(),
   });
 
   const { data: awards = [] } = useQuery({
     queryKey: ['fitnessAwards'],
     queryFn: async () => {
-      if (Platform.OS === 'web') return [];
       const data = await awardsDb.getAll();
       if (data.length === 0) {
         await seedAwards();
