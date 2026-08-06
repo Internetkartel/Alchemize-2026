@@ -7,7 +7,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Compass, Edit3, Flame, Heart, Hou
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { gratitudeSupabase } from '@/services/gratitude.service';
+import { gratitudeService } from '@/services/gratitude.service';
 import type { GratitudeEntry } from '@/types';
 import { startOfLocalDay } from '@/lib/date-utils';
 import LoadingState from '@/components/LoadingState';
@@ -149,7 +149,7 @@ export default function GratitudeJournalScreen() {
   const { data: entries = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['gratitude-entries'],
     queryFn: async () => {
-      const result = await gratitudeSupabase.getAll();
+      const result = await gratitudeService.getAll();
       if (!result.success) throw new Error(result.error);
       return (result.data as GratitudeEntry[]) ?? [];
     },

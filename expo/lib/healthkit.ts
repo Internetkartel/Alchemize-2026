@@ -319,14 +319,53 @@ export async function syncHealthKitData(): Promise<{
 
   const workouts = await fetchHealthKitWorkouts(startDate, endDate);
 
+  const { workoutSessionsDb, normalizedMetricsDb } = await import('./database');
+
+  let imported = 0;
+  for (const workout of workouts) {
+    const sessionId = `healthkit_${workout.id}`;
+    const existing = await workoutSessionsDb.getById(sessionId);
+    if (existing) continue;
+
+    const caloriesEstimate = workout.caloriesBurned ?? null;
+
+    await workoutSessionsDb.create({
+      id: sessionId,
+      templateId: 'healthkit',
+      startedAt: new Date(workout.startDate).getTime(),
+      endedAt: new Date(workout.endDate).getTime(),
+      durationMinutes: workout.duration,
+      completed: true,
+      caloriesEstimate,
+      source: 'wearable',
+    });
+
+    const dateStr = workout.startDate.split('T')[0];
+    await normalizedMetricsDb.upsert({
+      id: `healthkit_${dateStr}`,
+      date: dateStr,
+      activeMinutes: workout.duration,
+      caloriesActive: caloriesEstimate ?? 0,
+      steps: 0,
+      source: 'wearable',
+      deviceType: 'none',
+    });
+
+    imported++;
+  }
+
   await setLastSyncTime(new Date().toISOString());
 
-  console.log('[HealthKit] Sync complete. Imported', workouts.length, 'workouts');
+  console.log('[HealthKit] Sync complete. Imported', imported, 'of', workouts.length, 'workouts');
 
   return {
     success: true,
-    workoutsImported: workouts.length,
-    message: `Synced ${workouts.length} workouts from Apple Health`,
+    workoutsImported: imported,
+    message: imported > 0
+      ? `Synced ${imported} new workout${imported === 1 ? '' : 's'} from Apple Health`
+      : workouts.length > 0
+        ? 'Already up to date — no new workouts since last sync'
+        : 'No workouts found in Apple Health for the last 7 days',
   };
 }
 

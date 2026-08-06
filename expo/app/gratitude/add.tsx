@@ -4,7 +4,7 @@ import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { gratitudeSupabase } from '@/services/gratitude.service';
+import { gratitudeService } from '@/services/gratitude.service';
 import { useTheme } from '@/contexts/theme-context';
 import type { GratitudeEntry } from '@/types';
 
@@ -25,7 +25,7 @@ export default function AddGratitudeEntryScreen() {
   const { data: existingEntry } = useQuery({
     queryKey: ['gratitude-entry', selectedDate],
     queryFn: async () => {
-      const result = await gratitudeSupabase.getByDate(selectedDate);
+      const result = await gratitudeService.getByDate(selectedDate);
       if (!result.success) throw new Error(result.error);
       return result.data as GratitudeEntry | null;
     },
@@ -34,7 +34,7 @@ export default function AddGratitudeEntryScreen() {
   const saveMutation = useMutation({
     mutationFn: async (entry: GratitudeEntry) => {
       // Use UPSERT so one entry per user per date — creates or replaces
-      const result = await gratitudeSupabase.save(entry);
+      const result = await gratitudeService.save(entry);
       if (!result.success) throw new Error(result.error);
       return result;
     },

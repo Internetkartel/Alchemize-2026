@@ -1619,6 +1619,15 @@ export const gratitudeDb = {
     const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync('DELETE FROM gratitude_entries WHERE id = ? AND userId = ?', [id, userId]);
   },
+
+  async save(entry: GratitudeEntry): Promise<void> {
+    const existing = await this.getByDate(entry.entryDate);
+    if (existing) {
+      await this.update({ ...entry, id: existing.id, createdAt: existing.createdAt });
+    } else {
+      await this.create(entry);
+    }
+  },
 };
 
 export const affirmationsDb = {

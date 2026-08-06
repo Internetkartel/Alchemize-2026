@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksDb, goalsDb, mealsDb, transactionsDb } from '@/lib/db';
-import { gratitudeSupabase } from '@/services/gratitude.service';
+import { gratitudeService } from '@/services/gratitude.service';
 import type { Task, Goal, Meal, Transaction, GratitudeEntry } from '@/types';
 
 const QUICK_ADD_OPTIONS = ['Task', 'Goal', 'Meal', 'Transaction', 'Gratitude'] as const;
@@ -53,7 +53,7 @@ export default function QuickAddScreen() {
     mutationFn: async (entry: GratitudeEntry) => {
       // Gratitude entries are one-per-user-per-day; use save() (upsert) since an entry for
       // today may already exist (e.g. created via the dedicated Gratitude screen).
-      const result = await gratitudeSupabase.save(entry);
+      const result = await gratitudeService.save(entry);
       if (!result.success) throw new Error(result.error);
       return result;
     },
