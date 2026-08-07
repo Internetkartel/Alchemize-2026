@@ -44,3 +44,9 @@ jobs:
 
       - name: Run final validation
         run: node scripts/final-validation.js
+
+      - name: Export web bundle
+        run: npx expo export --platform web
+
+      - name: Export Android bundle
+        run: npx expo export --platform android

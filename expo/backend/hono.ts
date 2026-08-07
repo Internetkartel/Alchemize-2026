@@ -8,11 +8,34 @@ import { initSurrealDB } from "./lib/surrealdb";
 
 const app = new Hono();
 
-app.use("*", cors());
+// Native app requests (iOS/Android) don't send an Origin header, so CORS only
+// matters for the web build. Restrict to the production web domain (app.json's
+// router.origin) and localhost for local dev.
+const ALLOWED_ORIGINS = ["https://alchemize.app"];
 
-initSurrealDB().catch((error) => {
-  console.error('[Hono] Failed to initialize SurrealDB:', error);
-});
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin) return origin;
+      if (ALLOWED_ORIGINS.includes(origin)) return origin;
+      if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+      return null;
+    },
+  }),
+);
+
+let surrealReady = false;
+let surrealInitError: string | null = null;
+
+initSurrealDB()
+  .then(() => {
+    surrealReady = true;
+  })
+  .catch((error) => {
+    surrealInitError = error instanceof Error ? error.message : "Unknown SurrealDB init error";
+    console.error("[Hono] Failed to initialize SurrealDB:", error);
+  });
 
 app.use(
   "/api/trpc/*",
@@ -23,6 +46,12 @@ app.use(
 );
 
 app.get("/", (c) => {
+  if (!surrealReady) {
+    return c.json(
+      { status: "error", message: "SurrealDB not initialized", error: surrealInitError },
+      503,
+    );
+  }
   return c.json({ status: "ok", message: "API is running" });
 });
 

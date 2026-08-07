@@ -28,24 +28,30 @@ export interface CompressedImage {
   compressionRatio: number;
 }
 
+const SIGNED_URL_EXPIRY_SECONDS = 60 * 60; // 1 hour
+
 export interface UploadResult {
   success: boolean;
   error?: string;
-  publicUrl?: string;
+  signedUrl?: string;
+  signedUrlExpiresInSeconds?: number;
   path?: string;
   metadata?: CompressedImage;
 }
 
 /**
- * Sanitize a filename: remove special chars, limit length, keep extension.
+ * Sanitize a filename for storage. compressImageBeforeUpload() always converts
+ * output to JPEG (SaveFormat.JPEG), so the stored filename must always end in
+ * .jpg regardless of the original file's extension — otherwise the filename
+ * (e.g. photo.png) would mismatch the actual uploaded bytes/content-type
+ * (image/jpeg).
  */
 function safeFilename(originalName: string): string {
-  const ext = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')) : '.jpg';
   const base = originalName
     .replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .substring(0, 50);
-  return `${base}${ext}`;
+  return `${base || 'image'}.jpg`;
 }
 
 /**
@@ -162,14 +168,22 @@ export async function uploadImageToSupabase(
 
     if (error) throw error;
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage
+    // Short-lived signed URL rather than a permanent public one — the
+    // 'user-uploads' bucket must be configured as private in the Supabase
+    // dashboard for this to actually restrict access (bucket privacy is a
+    // dashboard setting, not something this code can enforce).
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(BUCKET)
-      .getPublicUrl(storagePath);
+      .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_SECONDS);
+
+    logSupabaseOp('STORAGE_UPLOAD', BUCKET, { error: signedUrlError }, `signed url for path=${storagePath}`);
+
+    if (signedUrlError) throw signedUrlError;
 
     return {
       success: true,
-      publicUrl: publicUrlData.publicUrl,
+      signedUrl: signedUrlData.signedUrl,
+      signedUrlExpiresInSeconds: SIGNED_URL_EXPIRY_SECONDS,
       path: storagePath,
       metadata: compressedImage,
     };
