@@ -1223,7 +1223,7 @@ export default function SettingsScreen() {
               </Text>
 
               <View style={styles.legalCreditWrap}>
-                <Text style={styles.legalCredit}>Developed by FRC Enterprise</Text>
+                <Text style={styles.legalCredit}>Developed by Alchemize</Text>
                 <Text style={styles.legalCredit}>Powered &amp; Designed by Metallicv1</Text>
               </View>
               <View style={styles.legalBottomPadding} />

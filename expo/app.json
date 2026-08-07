@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FRC Enterprise - Alchemize",
+    "name": "Alchemize",
     "slug": "alchemize-level-up",
     "version": "1.4.3",
     "orientation": "portrait",
@@ -38,8 +38,8 @@
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
-      "name": "FRC Enterprise - Alchemize",
-      "shortName": "FRC Alchemize",
+      "name": "Alchemize",
+      "shortName": "Alchemize",
       "themeColor": "#0c0520",
       "backgroundColor": "#0c0520",
       "display": "standalone",
