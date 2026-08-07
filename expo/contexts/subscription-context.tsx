@@ -75,7 +75,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         }
         const initialized = await initPurchases(currentUserId);
         if (!initialized) {
-          if (mounted) setIsPro(true);
+          // Do not grant Pro on a failed init — that would silently bypass the
+          // paywall for anyone who can make RevenueCat init fail (bad network,
+          // misconfigured key, SDK error). Leave isPro at its safe default (false).
           return;
         }
         await loadSubscriptionData();
