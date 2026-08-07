@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Alchemize",
+    "name": "FRC Enterprise - Alchemize",
     "slug": "alchemize-level-up",
     "version": "1.4.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rork-app",
+    "scheme": "frc-alchemize",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.repo.alchemize-level-up",
+      "bundleIdentifier": "com.frce.alchemize",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0c0520"
       },
-      "package": "app.rork.alchemize_app_skeleton",
+      "package": "com.frce.alchemize",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -38,8 +38,8 @@
     },
     "web": {
       "favicon": "./assets/images/favicon.png",
-      "name": "Alchemize",
-      "shortName": "Alchemize",
+      "name": "FRC Enterprise - Alchemize",
+      "shortName": "FRC Alchemize",
       "themeColor": "#0c0520",
       "backgroundColor": "#0c0520",
       "display": "standalone",
