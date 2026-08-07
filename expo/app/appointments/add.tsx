@@ -7,7 +7,7 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { Calendar, Clock, User, Briefcase, FileText, Check } from 'lucide-react-native';
-import { appointmentSupabase } from '@/services/appointments.service';
+import { appointmentService } from '@/services/appointments.service';
 import type { Appointment, AppointmentCategory } from '@/types';
 import { startOfLocalDay } from '@/lib/date-utils';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -50,7 +50,7 @@ export default function AddAppointmentScreen() {
 
   const loadAppointment = async (id: string) => {
     try {
-      const result = await appointmentSupabase.getById(id);
+      const result = await appointmentService.getById(id);
       if (result.success && result.data) {
         const appointment = result.data as Appointment;
         setTitle(appointment.title);
@@ -61,7 +61,7 @@ export default function AddAppointmentScreen() {
         setReminder(appointment.reminder);
         setIsEditing(true);
         setEditingId(id);
-        console.log('[Appointments] Loaded appointment for editing from Supabase:', id);
+        console.log('[Appointments] Loaded appointment for editing:', id);
       }
     } catch (error) {
       console.error('[Appointments] Error loading appointment:', error);
@@ -89,10 +89,10 @@ export default function AddAppointmentScreen() {
 
       let result;
       if (isEditing) {
-        result = await appointmentSupabase.update(appointment);
+        result = await appointmentService.update(appointment);
         console.log('[Appointments] Updated appointment in Supabase:', appointment.id);
       } else {
-        result = await appointmentSupabase.create(appointment);
+        result = await appointmentService.create(appointment);
         console.log('[Appointments] Created appointment in Supabase:', appointment.id);
       }
 

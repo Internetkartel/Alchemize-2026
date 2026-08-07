@@ -19,7 +19,7 @@ import {
   X,
   Star,
 } from 'lucide-react-native';
-import { appointmentSupabase } from '@/services/appointments.service';
+import { appointmentService } from '@/services/appointments.service';
 import { goalsDb } from '@/lib/db/goals';
 import type { Appointment, Goal } from '@/types';
 import { localDateKey } from '@/lib/date-utils';
@@ -173,10 +173,10 @@ export default function AppointmentsScreen() {
 
   const loadAppointments = useCallback(async () => {
     try {
-      const result = await appointmentSupabase.fetchAll();
+      const result = await appointmentService.fetchAll();
       if (result.success && result.data) {
         setAppointments(result.data as Appointment[]);
-        console.log('[Appointments] Loaded', (result.data as Appointment[]).length, 'appointments from Supabase');
+        console.log('[Appointments] Loaded', (result.data as Appointment[]).length, 'appointments');
       } else {
         console.error('[Appointments] Failed to load:', result.error);
       }
@@ -356,7 +356,7 @@ export default function AppointmentsScreen() {
   const executeConfirmAction = useCallback(async () => {
     try {
       if (confirmAction === 'delete' && selectedAppointment) {
-        const result = await appointmentSupabase.delete(selectedAppointment.id);
+        const result = await appointmentService.delete(selectedAppointment.id);
         if (!result.success) {
           console.error('[Appointments] Delete failed:', result.error);
           Alert.alert('Delete failed', result.error || 'Could not delete appointment.');
@@ -367,7 +367,7 @@ export default function AppointmentsScreen() {
       } else if (confirmAction === 'clear') {
         let hadError = false;
         for (const apt of appointments) {
-          const result = await appointmentSupabase.delete(apt.id);
+          const result = await appointmentService.delete(apt.id);
           if (!result.success) {
             console.error('[Appointments] Failed to delete:', apt.id, result.error);
             hadError = true;

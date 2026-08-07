@@ -1,13 +1,15 @@
 /**
- * Appointments persistence via Supabase.
+ * Appointments persistence via local SQLite (appointmentsDb).
  *
- * Design:
- * - Every appointment has: id, user_id, title, category, date, time, notes, created_at, updated_at
- * - CRUD uses the real Supabase row id — never array index or composite key
- * - Business and Personal appointments share the same CRUD service
- * - After any mutation, the caller is responsible for refreshing local state
+ * This previously depended on Supabase, which requires EXPO_PUBLIC_SUPABASE_URL /
+ * EXPO_PUBLIC_SUPABASE_ANON_KEY, an appointments table, and RLS policies that are
+ * not provisioned in this repo — any user without that external setup hit a hard
+ * error on every appointment read/write. It also meant nutrition-reminder entries
+ * created from the calorie scanner/add flow (which already write to the local
+ * appointmentsDb table) were invisible to this screen, and vice versa. Routing
+ * through the same local table both fixes the crash and reunifies that data.
  */
-import { getSupabase, getSupabaseUserId, logSupabaseOp } from '@/lib/supabase';
+import { appointmentsDb } from '@/lib/db/appointments';
 import type { Appointment } from '@/types';
 
 export interface AppointmentServiceResult {
@@ -16,171 +18,59 @@ export interface AppointmentServiceResult {
   data?: Appointment | Appointment[] | null;
 }
 
-const TABLE = 'appointments';
-
-function mapRow(row: any): Appointment {
-  return {
-    id: row.id,
-    title: row.title ?? '',
-    date: row.date ?? 0,
-    time: row.time ?? '09:00',
-    category: row.category ?? 'personal',
-    notes: row.notes ?? '',
-    reminder: Boolean(row.reminder),
-    createdAt: row.createdAt ?? row.created_at ?? Date.now(),
-    metadata: row.metadata ?? null,
-  };
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return 'Unexpected error';
 }
 
-function mapToRow(appointment: Appointment, userId: string) {
-  return {
-    id: appointment.id,
-    user_id: userId,
-    title: appointment.title,
-    date: appointment.date,
-    time: appointment.time,
-    category: appointment.category,
-    notes: appointment.notes,
-    reminder: appointment.reminder,
-    createdAt: appointment.createdAt,
-    metadata: appointment.metadata ?? null,
-  };
-}
-
-async function fetchAllForUser(userId: string): Promise<Appointment[]> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .eq('user_id', userId)
-    .order('date', { ascending: true })
-    .order('time', { ascending: true });
-
-  logSupabaseOp('SELECT', TABLE, { error }, `count=${data?.length ?? 0}`);
-  if (error) throw error;
-  return (data ?? []).map(mapRow);
-}
-
-async function fetchById(userId: string, id: string): Promise<Appointment | null> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  logSupabaseOp('SELECT', TABLE, { error }, `id=${id} found=${!!data}`);
-  if (error) throw error;
-  return data ? mapRow(data) : null;
-}
-
-async function createAppointment(appointment: Appointment): Promise<Appointment> {
-  const userId = getSupabaseUserId();
-  const supabase = getSupabase();
-  const row = mapToRow(appointment, userId);
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert(row)
-    .select()
-    .single();
-
-  logSupabaseOp('INSERT', TABLE, { error }, `id=${appointment.id} title="${appointment.title}"`);
-  if (error) throw error;
-  return mapRow(data);
-}
-
-async function updateAppointmentById(appointment: Appointment): Promise<Appointment> {
-  const userId = getSupabaseUserId();
-  const supabase = getSupabase();
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .update({
-      title: appointment.title,
-      date: appointment.date,
-      time: appointment.time,
-      category: appointment.category,
-      notes: appointment.notes,
-      reminder: appointment.reminder,
-      metadata: appointment.metadata ?? null,
-    })
-    .eq('id', appointment.id)
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  logSupabaseOp('UPDATE', TABLE, { error }, `id=${appointment.id} title="${appointment.title}"`);
-  if (error) throw error;
-  return mapRow(data);
-}
-
-async function deleteAppointmentById(id: string): Promise<void> {
-  const userId = getSupabaseUserId();
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .eq('id', id)
-    .eq('user_id', userId);
-
-  logSupabaseOp('DELETE', TABLE, { error }, `id=${id}`);
-  if (error) throw error;
-}
-
-// Public API — structured results for safe UI consumption
-
-export const appointmentSupabase = {
+export const appointmentService = {
   async fetchAll(): Promise<AppointmentServiceResult> {
     try {
-      const userId = getSupabaseUserId();
-      const data = await fetchAllForUser(userId);
+      const data = await appointmentsDb.getAll();
       return { success: true, data };
-    } catch (error: any) {
-      console.error('[AppointmentService] fetchAll failed:', error?.message || error);
-      return { success: false, error: error?.message || 'Failed to load appointments', data: [] };
+    } catch (error: unknown) {
+      console.error('[AppointmentService] fetchAll failed:', errorMessage(error));
+      return { success: false, error: errorMessage(error), data: [] };
     }
   },
 
   async getById(id: string): Promise<AppointmentServiceResult> {
     try {
-      const userId = getSupabaseUserId();
-      const data = await fetchById(userId, id);
+      const data = await appointmentsDb.getById(id);
       return { success: true, data };
-    } catch (error: any) {
-      console.error('[AppointmentService] getById failed:', error?.message || error);
-      return { success: false, error: error?.message || 'Failed to load appointment', data: null };
+    } catch (error: unknown) {
+      console.error('[AppointmentService] getById failed:', errorMessage(error));
+      return { success: false, error: errorMessage(error), data: null };
     }
   },
 
   async create(appointment: Appointment): Promise<AppointmentServiceResult> {
     try {
-      const data = await createAppointment(appointment);
-      return { success: true, data };
-    } catch (error: any) {
-      console.error('[AppointmentService] create failed:', error?.message || error);
-      return { success: false, error: error?.message || 'Failed to create appointment' };
+      await appointmentsDb.create(appointment);
+      return { success: true, data: appointment };
+    } catch (error: unknown) {
+      console.error('[AppointmentService] create failed:', errorMessage(error));
+      return { success: false, error: errorMessage(error) };
     }
   },
 
   async update(appointment: Appointment): Promise<AppointmentServiceResult> {
     try {
-      const data = await updateAppointmentById(appointment);
-      return { success: true, data };
-    } catch (error: any) {
-      console.error('[AppointmentService] update failed:', error?.message || error);
-      return { success: false, error: error?.message || 'Failed to update appointment' };
+      await appointmentsDb.update(appointment);
+      return { success: true, data: appointment };
+    } catch (error: unknown) {
+      console.error('[AppointmentService] update failed:', errorMessage(error));
+      return { success: false, error: errorMessage(error) };
     }
   },
 
   async delete(id: string): Promise<AppointmentServiceResult> {
     try {
-      await deleteAppointmentById(id);
+      await appointmentsDb.delete(id);
       return { success: true };
-    } catch (error: any) {
-      console.error('[AppointmentService] delete failed:', error?.message || error);
-      return { success: false, error: error?.message || 'Failed to delete appointment' };
+    } catch (error: unknown) {
+      console.error('[AppointmentService] delete failed:', errorMessage(error));
+      return { success: false, error: errorMessage(error) };
     }
   },
 };

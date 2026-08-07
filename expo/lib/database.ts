@@ -1725,7 +1725,15 @@ export const appointmentsDb = {
       reminder: Boolean(row.reminder),
     }));
   },
-  
+
+  async getById(id: string): Promise<Appointment | null> {
+    const database = await ensureDatabase();
+    const userId = getCurrentUserId() ?? 'guest';
+    const row = await database.getFirstAsync<any>('SELECT * FROM appointments WHERE id = ? AND userId = ?', [id, userId]);
+    if (!row) return null;
+    return { ...row, reminder: Boolean(row.reminder) };
+  },
+
   async create(appointment: Appointment): Promise<void> {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';

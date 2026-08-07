@@ -8,7 +8,7 @@
  * (habits, goals, calorie tracker, financial planner) is local-first SQLite, so
  * gratitude now follows the same pattern for consistency and reliability.
  */
-import { gratitudeDb } from '@/lib/database';
+import { gratitudeDb } from '@/lib/db/gratitude';
 import type { GratitudeEntry } from '@/types';
 
 export interface GratitudeServiceResult {
