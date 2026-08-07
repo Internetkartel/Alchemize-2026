@@ -9,7 +9,7 @@ import { ChevronLeft } from "lucide-react-native";
 import * as SplashScreen from "expo-splash-screen";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
-import { SubscriptionProvider, useSubscription } from "@/contexts/subscription-context";
+import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { initDatabase } from '@/lib/db/core';
 import NetworkBanner from "@/components/NetworkBanner";
 import GestureOnboarding from "@/components/GestureOnboarding";
@@ -89,24 +89,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function PaywallGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isPro, isLoading: subLoading } = useSubscription();
-  const router = useRouter();
-  const segments = useSegments();
-  const navState = useRootNavigationState();
-
-  useEffect(() => {
-    if (authLoading || subLoading) return;
-    if (!navState?.key) return;
-    if (!isAuthenticated) return; // AuthGate handles unauthenticated users
-    const onPaywall = segments[0] === 'paywall';
-    if (!isPro && !onPaywall) {
-      router.replace('/paywall');
-    } else if (isPro && onPaywall) {
-      router.replace('/');
-    }
-  }, [isAuthenticated, authLoading, isPro, subLoading, segments, navState?.key, router]);
-
+  // Paywall enforcement disabled by request — no redirect to /paywall for
+  // non-Pro users. The /paywall screen, RevenueCat purchase/restore flow,
+  // and useSubscription() still exist and work if re-enabled later; this
+  // just stops gating navigation on isPro.
   return <>{children}</>;
 }
 
