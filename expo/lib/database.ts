@@ -978,40 +978,50 @@ export async function ensureDatabase(): Promise<DatabaseAdapter> {
   return db as unknown as DatabaseAdapter;
 }
 
+// Every user-owned table, scoped by a direct userId column. goal_completions is
+// handled separately below — it has no userId column of its own, only a goalId
+// FK into the (userId-scoped) goals table.
+const USER_SCOPED_TABLES = [
+  'user_profile', 'manifestations', 'goals', 'goal_checklist_items', 'habits',
+  'habit_completions', 'transactions', 'financial_income', 'financial_expenses',
+  'financial_notes', 'meals', 'food_logs', 'saved_foods', 'nutrition_goals',
+  'planned_meals', 'tasks', 'gratitude_entries', 'affirmations', 'workouts',
+  'body_metrics', 'appointments', 'user_nutrition_profiles', 'water_logs',
+  'meal_prep_plans', 'fitness_goals', 'fitness_plans', 'workout_sessions',
+  'workout_templates', 'normalized_metrics', 'awards',
+] as const;
+
 export async function resetDatabase() {
+  const userId = getCurrentUserId() ?? 'guest';
+
   if (Platform.OS === 'web') {
-    Object.keys(webStore).forEach(key => { webStore[key] = []; });
-    console.log('[Database] Web store reset');
+    for (const table of USER_SCOPED_TABLES) {
+      if (!webStore[table]) continue;
+      webStore[table] = webStore[table].filter((row: any) => row.userId !== userId);
+    }
+    if (webStore['goals']) {
+      const remainingGoalIds = new Set(webStore['goals'].map((g: any) => g.id));
+      if (webStore['goal_completions']) {
+        webStore['goal_completions'] = webStore['goal_completions'].filter((row: any) =>
+          remainingGoalIds.has(row.goalId)
+        );
+      }
+    }
+    console.log('[Database] Web store reset for user:', userId);
     return;
   }
+
   const database = await ensureDatabase();
-  await database.execAsync(`
-    DELETE FROM user_profile;
-    DELETE FROM manifestations;
-    DELETE FROM goals;
-    DELETE FROM goal_checklist_items;
-    DELETE FROM habits;
-    DELETE FROM habit_completions;
-    DELETE FROM transactions;
-    DELETE FROM financial_income;
-    DELETE FROM financial_expenses;
-    DELETE FROM financial_notes;
-    DELETE FROM meals;
-    DELETE FROM food_logs;
-    DELETE FROM saved_foods;
-    DELETE FROM nutrition_goals;
-    DELETE FROM planned_meals;
-    DELETE FROM tasks;
-    DELETE FROM gratitude_entries;
-    DELETE FROM affirmations;
-    DELETE FROM workouts;
-    DELETE FROM body_metrics;
-    DELETE FROM appointments;
-    DELETE FROM user_nutrition_profiles;
-    DELETE FROM water_logs;
-    DELETE FROM meal_prep_plans;
-  `);
-  console.log('Database reset');
+  // Must run before goals is deleted below — the subquery needs this user's
+  // goals to still exist to find their completions.
+  await database.runAsync(
+    'DELETE FROM goal_completions WHERE goalId IN (SELECT id FROM goals WHERE userId = ?)',
+    [userId]
+  );
+  for (const table of USER_SCOPED_TABLES) {
+    await database.runAsync(`DELETE FROM ${table} WHERE userId = ?`, [userId]);
+  }
+  console.log('[Database] Reset complete for user:', userId);
 }
 
 export const userProfileDb = {
