@@ -231,13 +231,19 @@ function validateProductionScalingBoundaries() {
 validateProductionScalingBoundaries();
 
 function validateCiAndRecovery() {
+  // stability-check.yml must live at the true repository root's .github/workflows/ —
+  // GitHub Actions never discovers workflows in a subdirectory (ROOT here is `expo/`,
+  // one level below the actual repo root), so this checks the real location.
+  const repoRoot = path.join(ROOT, '..');
   const required = [
-    '.github/workflows/stability-check.yml',
-    'scripts/recovery-integrity-check.js',
-    'scripts/crash-report-template.json'
+    { file: '.github/workflows/stability-check.yml', base: repoRoot },
+    { file: 'scripts/recovery-integrity-check.js', base: ROOT },
+    { file: 'scripts/crash-report-template.json', base: ROOT },
   ];
 
-  const missing = required.filter((file) => !fs.existsSync(path.join(ROOT, file)));
+  const missing = required
+    .filter(({ file, base }) => !fs.existsSync(path.join(base, file)))
+    .map(({ file }) => file);
 
   if (missing.length) {
     console.error('Missing CI/recovery files:', missing);
