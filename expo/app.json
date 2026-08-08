@@ -5,7 +5,7 @@
     "version": "1.4.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frc-alchemize",
+    "scheme": "rork-app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.frce.alchemize",
+      "bundleIdentifier": "app.repo.alchemize-level-up",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photos",
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0c0520"
       },
-      "package": "com.frce.alchemize",
+      "package": "app.rork.alchemize_app_skeleton",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -110,7 +110,7 @@
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Alchemize reads your Apple Health data (workouts, active energy, exercise minutes) to keep your fitness stats in sync.",
-          "NSHealthUpdateUsageDescription": false
+          "NSHealthUpdateUsageDescription": "Alchemize does not write any data to Apple Health."
         }
       ]
     ],
