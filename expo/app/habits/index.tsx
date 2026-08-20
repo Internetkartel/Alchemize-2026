@@ -283,7 +283,7 @@ export default function HabitsScreen() {
           <TouchableOpacity
             style={[styles.checkboxButton, isCompleted && styles.checkboxButtonCompleted]}
             onPress={() => completeCheckbox(habit)}
-            disabled={isCompleted}
+            disabled={isCompleted || completeHabitMutation.isPending}
           >
             {isCompleted ? (
               <>

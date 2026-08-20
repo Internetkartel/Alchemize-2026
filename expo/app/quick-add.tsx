@@ -5,9 +5,9 @@ import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { hapticSelection, hapticSuccess } from '@/lib/haptics';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { tasksDb, goalsDb, mealsDb, transactionsDb } from '@/lib/db';
+import { tasksDb, goalsDb, foodLogsDb, financialExpenseDb } from '@/lib/db';
 import { gratitudeService } from '@/services/gratitude.service';
-import type { Task, Goal, Meal, Transaction, GratitudeEntry } from '@/types';
+import type { Task, Goal, FoodLog, FinancialExpense, GratitudeEntry } from '@/types';
 
 const QUICK_ADD_OPTIONS = ['Task', 'Goal', 'Meal', 'Transaction', 'Gratitude'] as const;
 
@@ -34,17 +34,21 @@ export default function QuickAddScreen() {
   });
 
   const createMealMutation = useMutation({
-    mutationFn: (meal: Meal) => mealsDb.create(meal),
+    // Writes to food_logs (not the unused `meals` table) — food_logs is what
+    // the Calorie Tracker screen actually reads, so the entry shows up there.
+    mutationFn: (log: FoodLog) => foodLogsDb.create(log),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['meals'] });
+      queryClient.invalidateQueries({ queryKey: ['foodLogs'] });
       router.back();
     },
   });
 
   const createTransactionMutation = useMutation({
-    mutationFn: (transaction: Transaction) => transactionsDb.create(transaction),
+    // Writes to financial_expenses (not the unused `transactions` table) —
+    // financial_expenses is what the Financial Tracker screen actually reads.
+    mutationFn: (expense: FinancialExpense) => financialExpenseDb.create(expense),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-expenses'] });
       router.back();
     },
   });
@@ -116,27 +120,30 @@ export default function QuickAddScreen() {
       case 'Meal':
         createMealMutation.mutate({
           id: Date.now().toString(),
-          date: Date.now(),
-          name: input.trim(),
+          foodName: input.trim(),
+          servingDescription: '',
           calories: 0,
-          protein: null,
-          carbs: null,
-          fat: null,
-          notes: '',
+          proteinGrams: null,
+          carbGrams: null,
+          fatGrams: null,
+          sugarGrams: null,
+          fiberGrams: null,
+          mealType: 'snack',
+          sourceType: 'manual',
+          loggedAt: Date.now(),
+          isLocked: false,
+          calendarEventId: null,
         });
         break;
       case 'Transaction':
         createTransactionMutation.mutate({
           id: Date.now().toString(),
-          date: Date.now(),
-          amount: 0,
-          category: input.trim(),
-          note: '',
-          dayOfWeek: null,
-          time: null,
-          reminderEnabled: false,
-          reminderTime: null,
-          isRecurring: false,
+          expenseName: input.trim(),
+          expenseAmount: 0,
+          expenseCategory: 'other',
+          expenseDate: Date.now(),
+          notes: '',
+          createdAt: Date.now(),
         });
         break;
       case 'Gratitude':

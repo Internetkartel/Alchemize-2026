@@ -173,7 +173,7 @@ export default function GoalsScreen() {
 
       {filteredGoals.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No {filter} goals</Text>
+          <Text style={styles.emptyText}>No {filter === 'in_progress' ? 'active' : 'completed'} goals</Text>
           <Text style={styles.emptySubtext}>Tap + to create a goal</Text>
         </View>
       ) : (

@@ -254,6 +254,7 @@ export interface Appointment {
   reminder: boolean;
   createdAt: number;
   metadata?: string;
+  notificationId?: string | null;
 }
 
 export type ManifestationCategory = Manifestation['category'];

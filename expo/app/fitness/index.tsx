@@ -3,9 +3,9 @@ import { View, StyleSheet, ScrollView, Text, ImageBackground } from 'react-nativ
 import { TouchableOpacity } from '@/components/HapticTouchable';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { Play, TrendingUp, Award, ChevronRight, Plus, Dumbbell } from 'lucide-react-native';
+import { Play, TrendingUp, Award, ChevronRight, Plus, Dumbbell, Watch, Pencil } from 'lucide-react-native';
 import { workoutTemplatesDb, workoutSessionsDb, normalizedMetricsDb, fitnessGoalsDb, fitnessPlansDb, awardsDb } from '@/lib/db/fitness';
-import type { Award as AwardType, WorkoutTemplate } from '@/types';
+import type { Award as AwardType, WorkoutTemplate, WorkoutSession } from '@/types';
 import {
   seedWorkoutTemplates,
   seedAwards,
@@ -16,6 +16,29 @@ import {
   markActiveDay,
 } from '@/lib/fitness';
 import { usePedometer } from '@/hooks/use-pedometer';
+
+function SessionRow({ session, onPress }: { session: WorkoutSession; onPress: () => void }) {
+  const isFromHealthKit = session.id.startsWith('healthkit_');
+  const date = new Date(session.startedAt);
+  const dateLabel = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+  return (
+    <TouchableOpacity style={styles.sessionRow} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.sessionRowIcon}>
+        {isFromHealthKit ? <Watch size={18} color="#3b82f6" /> : <Dumbbell size={18} color="#10b981" />}
+      </View>
+      <View style={styles.sessionRowContent}>
+        <Text style={styles.sessionRowTitle}>
+          {isFromHealthKit ? 'Apple Health Workout' : 'Manual Workout'} &bull; {dateLabel}
+        </Text>
+        <Text style={styles.sessionRowSubtitle}>
+          {session.durationMinutes} min{session.caloriesEstimate != null ? ` • ${session.caloriesEstimate} cal` : ''}
+        </Text>
+      </View>
+      <Pencil size={16} color="#666" />
+    </TouchableOpacity>
+  );
+}
 
 function WorkoutCard({ workout, onPress }: { workout: WorkoutTemplate; onPress: () => void }) {
   return (
@@ -221,6 +244,21 @@ export default function FitnessHubScreen() {
               </View>
             </View>
           </View>
+
+          {sessions.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              <View style={styles.sessionsList}>
+                {sessions.slice(0, 8).map((session) => (
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    onPress={() => router.push(`/fitness/session/${session.id}` as any)}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Awards</Text>
@@ -528,6 +566,42 @@ const styles = StyleSheet.create({
   addManualSubtitle: {
     fontSize: 13,
     color: '#10b981',
+  },
+  sessionsList: {
+    backgroundColor: 'rgba(26, 26, 26, 0.8)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+  },
+  sessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  sessionRowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sessionRowContent: {
+    flex: 1,
+  },
+  sessionRowTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#fff',
+    marginBottom: 2,
+  },
+  sessionRowSubtitle: {
+    fontSize: 12,
+    color: '#888',
   },
   wearableNote: {
     flexDirection: 'row',

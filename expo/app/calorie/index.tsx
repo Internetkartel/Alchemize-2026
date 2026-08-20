@@ -21,6 +21,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import { foodLogsDb, userNutritionProfileDb, waterLogsDb } from '@/lib/db/food';
+import { appointmentsDb } from '@/lib/db/appointments';
 import { invalidateFoodLogs } from '@/services/queryInvalidationService';
 import type { FoodLog, WaterLog } from '@/types';
 
@@ -104,9 +105,18 @@ export default function CalorieTrackerScreen() {
   });
 
   const deleteFoodLogMutation = useMutation({
-    mutationFn: async (id: string) => foodLogsDb.delete(id),
+    mutationFn: async (log: FoodLog) => {
+      await foodLogsDb.delete(log.id);
+      // Every food log save also creates a linked Appointments/Calendar entry
+      // (tracked by calendarEventId) — without this, deleting here left a
+      // stale, unremovable duplicate showing the old calories/macros forever.
+      if (log.calendarEventId) {
+        await appointmentsDb.delete(log.calendarEventId);
+      }
+    },
     onSuccess: () => {
       invalidateFoodLogs(queryClient);
+      void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
     onError: (error: any) => {
@@ -118,7 +128,7 @@ export default function CalorieTrackerScreen() {
   const handleDeleteFoodLog = useCallback((log: FoodLog) => {
     Alert.alert('Delete Entry', `Remove "${log.foodName}" from your log?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteFoodLogMutation.mutate(log.id) },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteFoodLogMutation.mutate(log) },
     ]);
   }, [deleteFoodLogMutation]);
 

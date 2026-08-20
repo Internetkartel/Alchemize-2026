@@ -307,6 +307,7 @@ export default function GoalDetailScreen() {
                   isToday && styles.calendarDayToday,
                 ]}
                 onPress={() => handleDayPress(day)}
+                disabled={markDayMutation.isPending || unmarkDayMutation.isPending}
               >
                 <Text style={[
                   styles.calendarDayText,

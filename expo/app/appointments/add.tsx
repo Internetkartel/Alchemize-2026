@@ -11,7 +11,7 @@ import { appointmentService } from '@/services/appointments.service';
 import type { Appointment, AppointmentCategory } from '@/types';
 import { startOfLocalDay } from '@/lib/date-utils';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { scheduleAppointmentNotification } from '@/lib/notifications';
+import { scheduleAppointmentNotification, cancelNotification } from '@/lib/notifications';
 import { promptAddToCalendar } from '@/lib/calendar';
 
 const PERSONAL_COLOR = '#3b82f6';
@@ -32,6 +32,7 @@ export default function AddAppointmentScreen() {
   const [reminder, setReminder] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [existingNotificationId, setExistingNotificationId] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
@@ -59,6 +60,7 @@ export default function AddAppointmentScreen() {
         setCategory(appointment.category);
         setNotes(appointment.notes);
         setReminder(appointment.reminder);
+        setExistingNotificationId(appointment.notificationId ?? null);
         setIsEditing(true);
         setEditingId(id);
         console.log('[Appointments] Loaded appointment for editing:', id);
@@ -76,8 +78,28 @@ export default function AddAppointmentScreen() {
 
     setSaving(true);
     try {
+      const appointmentId = editingId || `apt_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      // Cancel any notification already scheduled for this appointment before
+      // (re)scheduling — otherwise editing the time, or turning the reminder
+      // off, left the old notification firing at the stale time regardless.
+      if (isEditing && existingNotificationId && Platform.OS !== ('web' as any)) {
+        await cancelNotification(existingNotificationId);
+      }
+
+      let notificationId: string | null = null;
+      if (reminder && Platform.OS !== ('web' as any)) {
+        notificationId = await scheduleAppointmentNotification(
+          appointmentId,
+          title.trim(),
+          startOfLocalDay(selectedDate).getTime(),
+          selectedTime,
+        );
+        console.log('[Appointments] Notification scheduled:', notificationId);
+      }
+
       const appointment: Appointment = {
-        id: editingId || `apt_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        id: appointmentId,
         title: title.trim(),
         date: startOfLocalDay(selectedDate).getTime(),
         time: selectedTime,
@@ -85,29 +107,20 @@ export default function AddAppointmentScreen() {
         notes: notes.trim(),
         reminder,
         createdAt: Date.now(),
+        notificationId,
       };
 
       let result;
       if (isEditing) {
         result = await appointmentService.update(appointment);
-        console.log('[Appointments] Updated appointment in Supabase:', appointment.id);
+        console.log('[Appointments] Updated appointment:', appointment.id);
       } else {
         result = await appointmentService.create(appointment);
-        console.log('[Appointments] Created appointment in Supabase:', appointment.id);
+        console.log('[Appointments] Created appointment:', appointment.id);
       }
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to save appointment');
-      }
-
-      if (reminder && Platform.OS !== ('web' as any)) {
-        await scheduleAppointmentNotification(
-          appointment.id,
-          appointment.title,
-          appointment.date,
-          appointment.time,
-        );
-        console.log('[Appointments] Notification scheduled for:', appointment.title);
       }
 
       if (!isEditing && Platform.OS !== ('web' as any)) {

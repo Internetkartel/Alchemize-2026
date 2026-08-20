@@ -83,8 +83,12 @@ export function getTodayProgress(sessions: WorkoutSession[], metrics: Normalized
   const workoutCalories = todaySessions.reduce((sum, s) => sum + (s.caloriesEstimate || 0), 0);
   
   return {
-    activeMinutes: workoutMinutes + (metrics?.activeMinutes || 0),
-    calories: workoutCalories + (metrics?.caloriesActive || 0),
+    // normalizedMetrics.activeMinutes/caloriesActive are written as a running
+    // mirror of session data (see workoutSessionsDb writers), not an
+    // independent measure — summing both here would double-count. Steps are
+    // the only field on metrics with no session equivalent.
+    activeMinutes: workoutMinutes,
+    calories: workoutCalories,
     steps: metrics?.steps || 0,
   };
 }

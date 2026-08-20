@@ -168,10 +168,44 @@ export default function AddMealScreen() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (foodLog: FoodLog) => foodLogsDb.update(foodLog),
+    mutationFn: async (foodLog: FoodLog) => {
+      await foodLogsDb.update(foodLog);
+      // Keep the linked Appointments/Calendar entry (created alongside every food
+      // log) in sync — without this, editing calories/macros here left the
+      // calendar entry showing the old, now-wrong values forever.
+      if (foodLog.calendarEventId) {
+        const existingEvent = await appointmentsDb.getById(foodLog.calendarEventId);
+        if (existingEvent) {
+          const loggedDate = new Date(foodLog.loggedAt);
+          const timeStr = loggedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          try {
+            await appointmentsDb.update({
+              ...existingEvent,
+              title: `${foodLog.foodName} (${foodLog.mealType})`,
+              date: new Date(loggedDate.getFullYear(), loggedDate.getMonth(), loggedDate.getDate()).getTime(),
+              time: timeStr,
+              notes: `${foodLog.calories} cal | P: ${foodLog.proteinGrams || 0}g C: ${foodLog.carbGrams || 0}g F: ${foodLog.fatGrams || 0}g`,
+              metadata: JSON.stringify({
+                foodLogId: foodLog.id,
+                calories: foodLog.calories,
+                protein: foodLog.proteinGrams,
+                carbs: foodLog.carbGrams,
+                fat: foodLog.fatGrams,
+                fiber: foodLog.fiberGrams,
+                source: foodLog.sourceType,
+                isLocked: foodLog.isLocked,
+              }),
+            });
+          } catch (error) {
+            console.error('[AddFood] Calendar reminder update failed (food log still updated):', error);
+          }
+        }
+      }
+    },
     onSuccess: () => {
       invalidateFoodLogs(queryClient);
       queryClient.invalidateQueries({ queryKey: ['foodLog', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     },
@@ -182,9 +216,15 @@ export default function AddMealScreen() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => foodLogsDb.delete(id),
+    mutationFn: async (foodLog: FoodLog) => {
+      await foodLogsDb.delete(foodLog.id);
+      if (foodLog.calendarEventId) {
+        await appointmentsDb.delete(foodLog.calendarEventId);
+      }
+    },
     onSuccess: () => {
       invalidateFoodLogs(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     },
@@ -244,16 +284,16 @@ export default function AddMealScreen() {
   }, [name, calories, protein, carbs, fat, fiber, servingSize, mealType, createFood, updateFood, isEditMode, existingLog]);
 
   const handleDelete = useCallback(() => {
-    if (!params.id) return;
+    if (!existingLog) return;
     Alert.alert('Delete Entry', 'Remove this food log entry? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => deleteMutation.mutate(params.id!),
+        onPress: () => deleteMutation.mutate(existingLog),
       },
     ]);
-  }, [params.id, deleteMutation]);
+  }, [existingLog, deleteMutation]);
 
   const handleQuickFood = useCallback((food: typeof QUICK_FOODS[0]) => {
     setName(food.name);

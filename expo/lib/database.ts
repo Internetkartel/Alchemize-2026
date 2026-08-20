@@ -311,19 +311,15 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase | null> {
   }
   
   dbInitPromise = (async () => {
-    try {
-      db = await SQLite.openDatabaseAsync('alchemize.db');
-    } catch (error) {
-      console.error('[Database] Failed to open database:', error);
-      dbInitPromise = null;
-      throw error;
-    }
-    return db;
-  })();
-  await dbInitPromise;
-  if (!db) throw new Error('Database failed to open');
-  const initializedDb = db as SQLite.SQLiteDatabase;
-  
+  let initializedDb: SQLite.SQLiteDatabase;
+  try {
+    initializedDb = await SQLite.openDatabaseAsync('alchemize.db');
+  } catch (error) {
+    console.error('[Database] Failed to open database:', error);
+    dbInitPromise = null;
+    throw error;
+  }
+
   try {
     await initializedDb.execAsync('PRAGMA journal_mode = WAL;');
     
@@ -605,7 +601,8 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase | null> {
       notes TEXT NOT NULL DEFAULT '',
       reminder INTEGER NOT NULL DEFAULT 1,
       createdAt INTEGER NOT NULL,
-      metadata TEXT
+      metadata TEXT,
+      notificationId TEXT
     );
     
     CREATE TABLE IF NOT EXISTS user_nutrition_profiles (
@@ -724,15 +721,25 @@ export async function initDatabase(): Promise<SQLite.SQLiteDatabase | null> {
     `);
     
     console.log('[Database] Tables created successfully');
-    
-    if (db) await runMigrations(db);
+
+    await runMigrations(initializedDb);
   } catch (error) {
     console.error('[Database] Failed to create tables:', error);
+    dbInitPromise = null;
     throw error;
   }
-  
+
   console.log('[Database] Initialized successfully');
+  // Only published to the module-level `db` (and thus visible to the early
+  // `if (db) return db;` check above, and to ensureDatabase()) once the
+  // connection is open AND every table/migration has finished — otherwise a
+  // concurrent caller could get a handle before tables exist and crash with
+  // "no such table".
+  db = initializedDb;
   return db;
+  })();
+
+  return dbInitPromise;
 }
 
 async function runMigrations(database: SQLite.SQLiteDatabase) {
@@ -931,6 +938,17 @@ if (!gratitudeHasReflection) {
       }
     }
 
+    const appointmentsHaveNotificationId = await checkColumn('appointments', 'notificationId');
+    if (!appointmentsHaveNotificationId) {
+      console.log('[Database] Adding notificationId column to appointments');
+      try {
+        await database.execAsync('ALTER TABLE appointments ADD COLUMN notificationId TEXT');
+        console.log('[Database] Successfully added notificationId column to appointments');
+      } catch (e) {
+        console.log('[Database] appointments notificationId column may already exist:', e);
+      }
+    }
+
     const checklistItemsHaveOrderIndex = await checkColumn('goal_checklist_items', 'orderIndex');
     if (!checklistItemsHaveOrderIndex) {
       console.log('[Database] Adding orderIndex column to goal_checklist_items');
@@ -978,12 +996,15 @@ export async function ensureDatabase(): Promise<DatabaseAdapter> {
   return db as unknown as DatabaseAdapter;
 }
 
-// Every user-owned table, scoped by a direct userId column. goal_completions is
-// handled separately below — it has no userId column of its own, only a goalId
-// FK into the (userId-scoped) goals table.
+// Every user-owned table, scoped by a direct userId column. goal_completions,
+// goal_checklist_items, and habit_completions are handled separately below —
+// they have no userId column of their own, only a goalId/habitId FK into a
+// (userId-scoped) parent table. SQLite foreign keys are not enforced in this
+// app (no PRAGMA foreign_keys = ON), so ON DELETE CASCADE in the schema does
+// NOT run automatically — these child tables must be deleted explicitly.
 const USER_SCOPED_TABLES = [
-  'user_profile', 'manifestations', 'goals', 'goal_checklist_items', 'habits',
-  'habit_completions', 'transactions', 'financial_income', 'financial_expenses',
+  'user_profile', 'manifestations', 'goals', 'habits',
+  'transactions', 'financial_income', 'financial_expenses',
   'financial_notes', 'meals', 'food_logs', 'saved_foods', 'nutrition_goals',
   'planned_meals', 'tasks', 'gratitude_entries', 'affirmations', 'workouts',
   'body_metrics', 'appointments', 'user_nutrition_profiles', 'water_logs',
@@ -995,27 +1016,52 @@ export async function resetDatabase() {
   const userId = getCurrentUserId() ?? 'guest';
 
   if (Platform.OS === 'web') {
+    if (webStore['goals']) {
+      const userGoalIds = new Set(
+        webStore['goals'].filter((g: any) => g.userId === userId).map((g: any) => g.id)
+      );
+      if (webStore['goal_completions']) {
+        webStore['goal_completions'] = webStore['goal_completions'].filter((row: any) =>
+          !userGoalIds.has(row.goalId)
+        );
+      }
+      if (webStore['goal_checklist_items']) {
+        webStore['goal_checklist_items'] = webStore['goal_checklist_items'].filter((row: any) =>
+          !userGoalIds.has(row.goalId)
+        );
+      }
+    }
+    if (webStore['habits']) {
+      const userHabitIds = new Set(
+        webStore['habits'].filter((h: any) => h.userId === userId).map((h: any) => h.id)
+      );
+      if (webStore['habit_completions']) {
+        webStore['habit_completions'] = webStore['habit_completions'].filter((row: any) =>
+          !userHabitIds.has(row.habitId)
+        );
+      }
+    }
     for (const table of USER_SCOPED_TABLES) {
       if (!webStore[table]) continue;
       webStore[table] = webStore[table].filter((row: any) => row.userId !== userId);
-    }
-    if (webStore['goals']) {
-      const remainingGoalIds = new Set(webStore['goals'].map((g: any) => g.id));
-      if (webStore['goal_completions']) {
-        webStore['goal_completions'] = webStore['goal_completions'].filter((row: any) =>
-          remainingGoalIds.has(row.goalId)
-        );
-      }
     }
     console.log('[Database] Web store reset for user:', userId);
     return;
   }
 
   const database = await ensureDatabase();
-  // Must run before goals is deleted below — the subquery needs this user's
-  // goals to still exist to find their completions.
+  // Must run before goals/habits are deleted below — the subqueries need
+  // this user's goals/habits to still exist to find their child rows.
   await database.runAsync(
     'DELETE FROM goal_completions WHERE goalId IN (SELECT id FROM goals WHERE userId = ?)',
+    [userId]
+  );
+  await database.runAsync(
+    'DELETE FROM goal_checklist_items WHERE goalId IN (SELECT id FROM goals WHERE userId = ?)',
+    [userId]
+  );
+  await database.runAsync(
+    'DELETE FROM habit_completions WHERE habitId IN (SELECT id FROM habits WHERE userId = ?)',
     [userId]
   );
   for (const table of USER_SCOPED_TABLES) {
@@ -1147,6 +1193,11 @@ export const goalsDb = {
   async delete(id: string): Promise<void> {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';
+    // Foreign keys aren't enforced (no PRAGMA foreign_keys = ON), so ON DELETE
+    // CASCADE in the schema doesn't run — without these, completions/checklist
+    // items would be orphaned forever every time a goal is deleted from the UI.
+    await database.runAsync('DELETE FROM goal_completions WHERE goalId = ?', [id]);
+    await database.runAsync('DELETE FROM goal_checklist_items WHERE goalId = ?', [id]);
     await database.runAsync('DELETE FROM goals WHERE id = ? AND userId = ?', [id, userId]);
   },
 };
@@ -1398,10 +1449,15 @@ export const financialNoteDb = {
       return;
     }
     const database = await ensureDatabase();
+    // The id is derived from userId here rather than trusting note.id — callers
+    // fall back to a hardcoded placeholder id when a user has no existing notes
+    // row yet, which would collide across different users' first-ever save and
+    // silently overwrite one user's notes with another's via INSERT OR REPLACE.
+    const noteId = `financial-note-${userId}`;
     await database.runAsync(
-      `INSERT OR REPLACE INTO financial_notes (id, userId, noteLoginInfo, noteTotalDebt, debtAmount, debtDueDate, savingsAmount, emergencyFund, savingsNotes, updatedAt) 
+      `INSERT OR REPLACE INTO financial_notes (id, userId, noteLoginInfo, noteTotalDebt, debtAmount, debtDueDate, savingsAmount, emergencyFund, savingsNotes, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [note.id, userId, note.noteLoginInfo, note.noteTotalDebt, note.debtAmount, note.debtDueDate, note.savingsAmount, note.emergencyFund, note.savingsNotes || '', note.updatedAt]
+      [noteId, userId, note.noteLoginInfo, note.noteTotalDebt, note.debtAmount, note.debtDueDate, note.savingsAmount, note.emergencyFund, note.savingsNotes || '', note.updatedAt]
     );
   },
 };
@@ -1748,17 +1804,17 @@ export const appointmentsDb = {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'INSERT INTO appointments (id, userId, title, date, time, category, notes, reminder, createdAt, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [appointment.id, userId, appointment.title, appointment.date, appointment.time, appointment.category, appointment.notes, appointment.reminder ? 1 : 0, appointment.createdAt, appointment.metadata || null]
+      'INSERT INTO appointments (id, userId, title, date, time, category, notes, reminder, createdAt, metadata, notificationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [appointment.id, userId, appointment.title, appointment.date, appointment.time, appointment.category, appointment.notes, appointment.reminder ? 1 : 0, appointment.createdAt, appointment.metadata || null, appointment.notificationId || null]
     );
   },
-  
+
   async update(appointment: Appointment): Promise<void> {
     const database = await ensureDatabase();
     const userId = getCurrentUserId() ?? 'guest';
     await database.runAsync(
-      'UPDATE appointments SET title = ?, date = ?, time = ?, category = ?, notes = ?, reminder = ?, metadata = ? WHERE id = ? AND userId = ?',
-      [appointment.title, appointment.date, appointment.time, appointment.category, appointment.notes, appointment.reminder ? 1 : 0, appointment.metadata || null, appointment.id, userId]
+      'UPDATE appointments SET title = ?, date = ?, time = ?, category = ?, notes = ?, reminder = ?, metadata = ?, notificationId = ? WHERE id = ? AND userId = ?',
+      [appointment.title, appointment.date, appointment.time, appointment.category, appointment.notes, appointment.reminder ? 1 : 0, appointment.metadata || null, appointment.notificationId || null, appointment.id, userId]
     );
   },
   
