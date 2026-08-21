@@ -107,6 +107,13 @@
       ],
       "expo-secure-store",
       [
+        "expo-calendar",
+        {
+          "calendarPermission": "Alchemize adds your appointments to your device calendar so you don't miss them.",
+          "remindersPermission": false
+        }
+      ],
+      [
         "@kingstinct/react-native-healthkit",
         {
           "NSHealthShareUsageDescription": "Alchemize reads your Apple Health data (workouts, active energy, exercise minutes) to keep your fitness stats in sync.",
