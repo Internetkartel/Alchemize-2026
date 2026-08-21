@@ -54,7 +54,7 @@ export function getSupabaseUserId(): string {
  * In production, errors still log; successes are silent unless verbose.
  */
 export function logSupabaseOp(
-  operation: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'UPSERT' | 'STORAGE_UPLOAD',
+  operation: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'UPSERT' | 'STORAGE_UPLOAD', | 'STORAGE_SIGNED_URL'
   tableOrBucket: string,
   result: { error: any } | null,
   extra?: string
