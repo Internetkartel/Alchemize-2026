@@ -28,14 +28,27 @@ app.use(
 let surrealReady = false;
 let surrealInitError: string | null = null;
 
-initSurrealDB()
+export const surrealInitialization = initSurrealDB()
   .then(() => {
     surrealReady = true;
   })
   .catch((error) => {
     surrealInitError = error instanceof Error ? error.message : "Unknown SurrealDB init error";
     console.error("[Hono] Failed to initialize SurrealDB:", error);
+    throw error;
   });
+
+// Fail closed for API traffic until the database is ready. This middleware
+// must be registered before the tRPC handler so requests cannot bypass it.
+app.use("/api/trpc/*", async (c, next) => {
+  if (!surrealReady) {
+    return c.json(
+      { status: "error", message: "Service temporarily unavailable" },
+      503,
+    );
+  }
+  await next();
+});
 
 app.use(
   "/api/trpc/*",

@@ -3,20 +3,22 @@
  *
  * Flow:
  * 1. Accept a file (from expo-image-picker or similar)
- * 2. Compress: resize to max 1600px, convert to JPEG/WebP at 0.75 quality
- * 3. Upload to Supabase Storage under users/{userId}/uploads/{timestamp}-{safeFilename}
- * 4. Return the public URL and metadata
+ * 2. Compress: resize to max 1600px, convert to JPEG at 0.75 quality
+ * 3. Upload to Supabase Storage under an opaque user-scoped UUID path
+ * 4. Return a short-lived signed URL and metadata
  */
-import { Platform } from 'react-native';
+import { Image } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import * as Crypto from 'expo-crypto';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { decode as base64Decode } from 'base64-arraybuffer';
 import { getSupabase, getSupabaseUserId, logSupabaseOp } from '@/lib/supabase';
 
 const MAX_DIMENSION = 1600;
 const COMPRESSION_QUALITY = 0.75;
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB reject threshold before compression
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const BUCKET = 'user-uploads';
+const SIGNED_URL_EXPIRY_SECONDS = 60 * 60;
 
 export interface CompressedImage {
   uri: string;
@@ -28,8 +30,6 @@ export interface CompressedImage {
   compressionRatio: number;
 }
 
-const SIGNED_URL_EXPIRY_SECONDS = 60 * 60; // 1 hour
-
 export interface UploadResult {
   success: boolean;
   error?: string;
@@ -39,85 +39,60 @@ export interface UploadResult {
   metadata?: CompressedImage;
 }
 
-/**
- * Sanitize a filename for storage. compressImageBeforeUpload() always converts
- * output to JPEG (SaveFormat.JPEG), so the stored filename must always end in
- * .jpg regardless of the original file's extension — otherwise the filename
- * (e.g. photo.png) would mismatch the actual uploaded bytes/content-type
- * (image/jpeg).
- */
-function safeFilename(originalName: string): string {
-  const base = originalName
-    .replace(/\.[^.]+$/, '')
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .substring(0, 50);
-  return `${base || 'image'}.jpg`;
+function getImageDimensions(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      (error) => reject(error),
+    );
+  });
 }
 
 /**
- * Compress an image before upload.
- *
- * @param fileUri - The local file URI (from image picker or camera)
- * @param fileName - Original filename for safe naming
- * @returns CompressedImage with metadata, or throws on failure
+ * Compress an image before upload while preserving aspect ratio and avoiding
+ * unnecessary upscaling of images that are already within the size limit.
  */
 export async function compressImageBeforeUpload(
   fileUri: string,
-  fileName: string = 'image.jpg'
+  _fileName: string = 'image.jpg'
 ): Promise<CompressedImage> {
-  console.log('[ImageUpload] Starting compression for:', fileName);
+  const fileInfo = await FileSystem.getInfoAsync(fileUri);
 
-  // Get original file info
-  let originalSize = 0;
-  try {
-    const fileInfo = await FileSystem.getInfoAsync(fileUri);
-    if (fileInfo.exists && fileInfo.size) {
-      originalSize = fileInfo.size;
-    }
-  } catch {
-    console.warn('[ImageUpload] Could not get original file size');
+  if (!fileInfo.exists || !fileInfo.size || fileInfo.size <= 0) {
+    throw new Error('Could not determine image file size.');
   }
 
-  // Reject files over max size before compression
+  const originalSize = fileInfo.size;
+
   if (originalSize > MAX_FILE_SIZE_BYTES) {
     throw new Error(
       `File is too large (${(originalSize / 1024 / 1024).toFixed(1)} MB). Maximum allowed is ${MAX_FILE_SIZE_BYTES / 1024 / 1024} MB.`
     );
   }
 
-  // Compress with expo-image-manipulator
-  const result = await manipulateAsync(
-    fileUri,
-    [
-      {
-        resize: {
-          width: MAX_DIMENSION,
-          height: MAX_DIMENSION,
-        },
-      },
-    ],
-    {
-      compress: COMPRESSION_QUALITY,
-      format: SaveFormat.JPEG,
-    }
-  );
+  const dimensions = await getImageDimensions(fileUri);
+  const largestDimension = Math.max(dimensions.width, dimensions.height);
+  const actions = largestDimension > MAX_DIMENSION
+    ? [
+        dimensions.width >= dimensions.height
+          ? { resize: { width: MAX_DIMENSION } }
+          : { resize: { height: MAX_DIMENSION } },
+      ]
+    : [];
 
-  // Get compressed file size
-  let compressedSize = 0;
-  try {
-    const compressedInfo = await FileSystem.getInfoAsync(result.uri);
-    if (compressedInfo.exists && compressedInfo.size) {
-      compressedSize = compressedInfo.size;
-    }
-  } catch {
-    console.warn('[ImageUpload] Could not get compressed file size');
+  const result = await manipulateAsync(fileUri, actions, {
+    compress: COMPRESSION_QUALITY,
+    format: SaveFormat.JPEG,
+  });
+
+  const compressedInfo = await FileSystem.getInfoAsync(result.uri);
+  if (!compressedInfo.exists || !compressedInfo.size || compressedInfo.size <= 0) {
+    throw new Error('Could not determine compressed image file size.');
   }
 
-  const compressionRatio = originalSize > 0 ? compressedSize / originalSize : 1;
-
-  console.log(
-    `[ImageUpload] Compressed: ${(originalSize / 1024).toFixed(1)} KB → ${(compressedSize / 1024).toFixed(1)} KB (${(compressionRatio * 100).toFixed(0)}%)`
-  );
+  const compressedSize = compressedInfo.size;
+  const compressionRatio = compressedSize / originalSize;
 
   return {
     uri: result.uri,
@@ -130,54 +105,37 @@ export async function compressImageBeforeUpload(
   };
 }
 
-/**
- * Upload a compressed image to Supabase Storage.
- *
- * @param compressedImage - Result from compressImageBeforeUpload()
- * @param fileName - Original filename for path construction
- * @returns UploadResult with public URL on success
- */
+/** Upload a compressed image to private Supabase Storage. */
 export async function uploadImageToSupabase(
   compressedImage: CompressedImage,
-  fileName: string = 'image.jpg'
+  _fileName: string = 'image.jpg'
 ): Promise<UploadResult> {
   try {
     const userId = getSupabaseUserId();
     const supabase = getSupabase();
-    const timestamp = Date.now();
-    const safeName = safeFilename(fileName);
-    const storagePath = `users/${userId}/uploads/${timestamp}-${safeName}`;
+    const storagePath = `users/${userId}/uploads/${Crypto.randomUUID()}.jpg`;
 
-    console.log('[ImageUpload] Uploading to:', storagePath);
-
-    // Read the compressed file as base64 and decode to ArrayBuffer
     const base64 = await FileSystem.readAsStringAsync(compressedImage.uri, {
       encoding: 'base64' as const,
     });
 
     const arrayBuffer = base64Decode(base64);
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(BUCKET)
       .upload(storagePath, arrayBuffer, {
         contentType: compressedImage.mimeType,
         upsert: false,
       });
 
-    logSupabaseOp('STORAGE_UPLOAD', BUCKET, { error }, `path=${storagePath}`);
-
+    logSupabaseOp('STORAGE_UPLOAD', BUCKET, { error }, 'upload');
     if (error) throw error;
 
-    // Short-lived signed URL rather than a permanent public one — the
-    // 'user-uploads' bucket must be configured as private in the Supabase
-    // dashboard for this to actually restrict access (bucket privacy is a
-    // dashboard setting, not something this code can enforce).
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from(BUCKET)
       .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_SECONDS);
 
-    logSupabaseOp('STORAGE_UPLOAD', BUCKET, { error: signedUrlError }, `signed url for path=${storagePath}`);
-
+    logSupabaseOp('STORAGE_SIGNED_URL', BUCKET, { error: signedUrlError }, 'signed-url');
     if (signedUrlError) throw signedUrlError;
 
     return {
@@ -196,10 +154,6 @@ export async function uploadImageToSupabase(
   }
 }
 
-/**
- * Full pipeline: compress then upload.
- * This is the main entry point for image handling.
- */
 export async function compressAndUpload(
   fileUri: string,
   fileName: string = 'image.jpg'

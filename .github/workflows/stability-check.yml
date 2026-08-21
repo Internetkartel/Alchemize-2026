@@ -22,31 +22,31 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: bunx tsc --noEmit
 
       - name: Lint
-        run: npx expo lint
+        run: bunx expo lint
 
       - name: Run handoff validation
-        run: node scripts/validate-handoff.js
+        run: bun scripts/validate-handoff.js
 
       - name: Run repository health check
-        run: node scripts/repo-health-check.js
+        run: bun scripts/repo-health-check.js
 
       - name: Run production preflight
-        run: node scripts/production-preflight.js
+        run: bun scripts/production-preflight.js
 
       - name: Run final validation
-        run: node scripts/final-validation.js
+        run: bun scripts/final-validation.js
 
       - name: Export web bundle
-        run: npx expo export --platform web
+        run: bunx expo export --platform web
 
       - name: Export Android bundle
-        run: npx expo export --platform android
+        run: bunx expo export --platform android
