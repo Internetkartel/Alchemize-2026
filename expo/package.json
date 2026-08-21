@@ -13,8 +13,8 @@
     "validate:health": "node scripts/repo-health-check.js",
     "validate:production": "node scripts/production-preflight.js",
     "validate:final": "node scripts/final-validation.js",
-    "ci:local": "npm run validate:final && npx expo-doctor && npm run lint",
-    "ci:audit": "npm audit --audit-level=moderate",
+    "ci:local": "bun run validate:final && bunx expo-doctor && bun run lint",
+    "ci:audit": "bun audit --audit-level=moderate",
     "backend:dev": "tsx backend/server.ts"
   },
   "dependencies": {
